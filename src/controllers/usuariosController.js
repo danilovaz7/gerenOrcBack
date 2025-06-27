@@ -21,12 +21,16 @@ export function generateRandomPassword() {
 }
 
 async function createUser(req, res) {
-  const { nome, email, matricula, experiencia, nivel, id_avatar, tipo_usuario_id, id_materia, id_escola, id_turma, genero } = req.body;
+  const { nome, id_tipo_usuario, dt_nascimento, rg, cpf, estado_civil, sexo,
+    endereco, num_endereco, complemento, cidade, bairro, cep,
+    naturalidade, nacionalidade, raca, telefone, celular, profissao,
+    local_trabalho, email, instagram, facebook } = req.body;
+
   const senhaRandom = generateRandomPassword();
   const senha = await bcrypt.hash(senhaRandom, 10);
 
-  const usuario = Usuario.build({ nome, email, senha, matricula, id_materia, experiencia, id_turma, id_avatar, id_escola, nivel, tipo_usuario_id, genero });
- 
+  const usuario = Usuario.build({ nome, id_tipo_usuario, dt_nascimento, senha, rg, cpf, estado_civil, sexo, endereco, num_endereco, complemento, cidade, bairro, cep, naturalidade, nacionalidade, raca, telefone, celular, profissao, local_trabalho, email, instagram, facebook, ic_ativo: true });
+
   try {
     await usuario.validate();
   } catch (error) {
@@ -41,56 +45,28 @@ async function createUser(req, res) {
 
 
   const mailOptions = {
-    from: 'equipeplay2learn@gmail.com',
+    from: '',
     to: usuario.email,
-    subject: 'Seja bem-vindo(a) ao Play2Learn',
+    subject: '',
     html: `
       <h2>Parabéns!</h2>
-      <p>Você foi cadastrado no sistema <strong>Play2Learn</strong></p>
+      <p></p>
       <p>
         <strong>E-mail:</strong> <strong>${usuario.email}</strong><br>
         <strong>Senha:</strong> <strong>${senhaRandom}</strong>
       </p>
-      <p>
-        <img src="cid:Play2LearnEmail" alt="Bem-vindo ao Play2Learn" style="max-width:100%; height:auto;" />
-      </p>
     `,
     attachments: [
       {
-        filename: 'Play2LearnEmail.jpg',       
-        path: './src/img/Play2LearnEmail.jpg',  
-        cid: 'Play2LearnEmail'               
+        filename: '',
+        path: '',
+        cid: ''
       }
     ]
   };
 
   await transporter.sendMail(mailOptions);
 
-  try {
-    const materias = await Materia.findAll();
-    const userId = usuario.id;
-
-    await Promise.all(materias.map(async (materia) => {
-      const materiaId = materia.id;
-      const materiaElo = EloMateria.build({ usuario_id: userId, materia_id: materiaId, elo_id: 1, subelo_id: 1, respostas_corretas_elo: 0, respostas_corretas_total: 0 });
-
-      try {
-        await materiaElo.validate();
-      } catch (error) {
-        throw new Error('Informações de materiaElo inválidas: ' + error.message);
-      }
-
-      try {
-        await materiaElo.save();
-      } catch (error) {
-        throw new Error('Erro ao criar materiaElo: ' + error.message);
-      }
-    }));
-
-    res.status(201).json(usuario.toJSON());
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 }
 
 async function getUsers(req, res) {
@@ -98,9 +74,6 @@ async function getUsers(req, res) {
   const limit = req.query.limit ? parseInt(req.query.limit) : null;
   const orderField = req.query.order ? req.query.order : null;
   let orderDirection = req.query.orderDirection ? req.query.orderDirection : 'DESC';
-  const id_turma = req.query.id_turma ? parseInt(req.query.id_turma) : null;
-  const materia_id = req.query.materiaId ? parseInt(req.query.materiaId) : null;
-  const id_escola = req.query.id_escola ? parseInt(req.query.id_escola) : null;
 
   if (orderField === 'nome') {
     orderDirection = 'ASC';
@@ -108,76 +81,16 @@ async function getUsers(req, res) {
 
   const queryOptions = {
     where: { tipo_usuario_id: 2 },
-    include: [
-      'avatar',
-      {
-        model: EloMateria,
-        as: 'elos',
-        include: ['elo'],
-        required: false,
-        where: materia_id ? { materia_id: materia_id } : undefined,
-      }
-    ],
   };
 
-  if (id_turma) {
-    queryOptions.where.id_turma = id_turma;
-  }
-  if (id_escola) {
-    queryOptions.where.id_escola = id_escola;
-  }
   if (limit !== null) {
     queryOptions.limit = limit;
   }
 
-  if (orderField === 'elo') {
-    if (!materia_id) {
-      return res.status(400).json({
-        error: "Para ordenar por elo, o parâmetro materia_id deve ser fornecido."
-      });
-    } else {
-      queryOptions.order = [
-        [Sequelize.col('elos.elo_id'), orderDirection],
-        [Sequelize.col('elos.subelo_id'), 'DESC']
-      ];
-    }
-  } else {
-    queryOptions.order = [[orderField, orderDirection]];
-  }
 
   try {
     const usuarios = await Usuario.findAll(queryOptions);
-
-    // Para cada usuário, calcular o win rate
-    const usuariosComWinRate = await Promise.all(usuarios.map(async (usuario) => {
-      // Total de disputas: salas encerradas e do tipo 'online' nas quais o usuário participou
-      const total_disputas = await SalaAluno.count({
-        include: {
-          model: Sala,
-          as: 'sala',
-          where: {
-            status: 'encerrada',
-            tipo: 'online',
-          },
-        },
-        where: { usuario_id: usuario.id }
-      });
-    
-      // Disputas ganhas: salas encerradas e do tipo 'online' onde o usuário foi declarado vencedor
-      const total_disputas_ganhas = await Sala.count({
-        where: {
-          vencedor_id: usuario.id,
-          status: 'encerrada',
-          tipo: 'online',
-        }
-      });
-    
-      const winRate = total_disputas > 0 ? (total_disputas_ganhas / total_disputas) * 100 : 0;
-    
-      return { ...usuario.toJSON(), winRate: winRate.toFixed(2) };
-    }));
-
-    res.json(Array.isArray(usuariosComWinRate) ? usuariosComWinRate : []);
+    res.json(Array.isArray(usuarios));
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar usuários', message: error.message });
   }
@@ -208,7 +121,10 @@ async function getTipoUsuarios(req, res) {
 
 async function updateUser(req, res) {
   const { id } = req.params
-  const { nome, email, senha, id_avatar, matricula, experiencia, nivel, tipo_usuario_id, ic_ativo } = req.body
+  const { nome, dt_nascimento, estado_civil,
+    sexo, endereco, num_endereco, complemento, cidade, bairro, cep,
+    naturalidade, nacionalidade, raca, telefone, celular, profissao,
+    local_trabalho, email, instagram, facebook, senha } = req.body;
 
   const usuario = await Usuario.findByPk(id)
 
@@ -222,12 +138,24 @@ async function updateUser(req, res) {
     const senhaCriptografada = await bcrypt.hash(senha, 10);
     usuario.senha = senhaCriptografada;
   }
-  if (matricula) usuario.matricula = matricula
-  if (experiencia) usuario.experiencia = experiencia
-  if (nivel) usuario.nivel = nivel
-  if (tipo_usuario_id) usuario.tipo_usuario_id = tipo_usuario_id
-  if (id_avatar) usuario.id_avatar = id_avatar
-  if (ic_ativo) usuario.ic_ativo = ic_ativo
+  if (dt_nascimento) usuario.dt_nascimento = dt_nascimento
+  if (estado_civil) usuario.estado_civil = estado_civil
+  if (sexo) usuario.sexo = sexo
+  if (endereco) usuario.endereco = endereco
+  if (num_endereco) usuario.num_endereco = num_endereco
+  if (complemento) usuario.complemento = complemento
+  if (cidade) usuario.cidade = cidade
+  if (bairro) usuario.bairro = bairro
+  if (cep) usuario.cep = cep
+  if (naturalidade) usuario.naturalidade = naturalidade
+  if (nacionalidade) usuario.nacionalidade = nacionalidade
+  if (raca) usuario.raca = raca
+  if (telefone) usuario.telefone = telefone
+  if (celular) usuario.celular = celular
+  if (profissao) usuario.profissao = profissao
+  if (local_trabalho) usuario.local_trabalho = local_trabalho
+  if (instagram) usuario.instagram = instagram
+  if (facebook) usuario.facebook = facebook
 
   try {
     await usuario.validate()

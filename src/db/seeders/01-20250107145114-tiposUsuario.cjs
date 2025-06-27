@@ -10,20 +10,10 @@ module.exports = {
         updatedAt: new Date()
       },
       {
-        nome: 'Aluno',
+        nome: 'Cliente',
         createdAt: new Date(),
         updatedAt: new Date()
       },
-      {
-        nome: 'Professor',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        nome: 'Diretor',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
     ]);
   },
 
