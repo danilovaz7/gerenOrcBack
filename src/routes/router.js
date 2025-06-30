@@ -4,11 +4,10 @@ import jwt from 'jsonwebtoken'
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import Usuario from '../models/Usuario.js';
-import transporter from '../services/email.js';
+//import transporter from '../services/email.js';
 
 import { authenticate } from '../services/authService.js'
 import usuariosController from '../controllers/usuariosController.js'
-import tiposController from '../controllers/tiposController.js'
 import loginController from '../controllers/loginController.js'
 
 const router = Router()
@@ -18,7 +17,6 @@ router.get('/usuarios',authenticate, usuariosController.getUsers)
 router.get('/usuarios/:id', authenticate,usuariosController.getUserById)
 router.put('/usuarios/:id', authenticate, usuariosController.updateUser)
 router.delete('/usuarios/:id', authenticate,usuariosController.deleteUser)
-router.get('/estatisticas/:id', authenticate,estatisticasController.getEstatisticasByUser)
 
 router.post('/login',loginController.login)
 router.get('/eu', pegarUsuarioDoToken)
@@ -60,6 +58,7 @@ function pegarUsuarioDoToken(req, res) {
     }
 }
 
+/*
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
   
@@ -112,4 +111,4 @@ router.post('/forgot-password', async (req, res) => {
       res.status(400).json({ message: 'Token inválido ou expirado.' });
     }
   });
-  
+  */

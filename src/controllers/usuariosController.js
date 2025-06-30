@@ -1,14 +1,9 @@
 import { Sequelize } from 'sequelize';
 import Usuario from "../models/Usuario.js";
-import EloMateria from "../models/EloMateria.js";
-import Materia from "../models/Materia.js";
 import TipoUsuario from "../models/TipoUsuario.js";
-import SalaAluno from "../models/SalaAluno.js";
-import Sala from "../models/Sala.js";
 import generator from "generate-password";
 import bcrypt from 'bcryptjs';
-import transporter from '../services/email.js';
-
+//import transporter from '../services/email.js';
 
 export function generateRandomPassword() {
   return generator.generate({
@@ -65,7 +60,7 @@ async function createUser(req, res) {
     ]
   };
 
-  await transporter.sendMail(mailOptions);
+  //await transporter.sendMail(mailOptions);
 
 }
 
@@ -100,7 +95,7 @@ async function getUsers(req, res) {
 async function getUserById(req, res) {
   const { id } = req.params
 
-  const usuario = await Usuario.findByPk(id, { include: ['tipo_usuario', 'avatar'] })
+  const usuario = await Usuario.findByPk(id)
 
   if (usuario) {
     res.json(usuario.toJSON())
