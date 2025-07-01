@@ -80,6 +80,10 @@ const Usuario = database.define('usuarios', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+    filhos: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   telefone: {
     type: DataTypes.STRING,
     allowNull: true,

@@ -15,55 +15,100 @@ export function generateRandomPassword() {
   });
 }
 
-async function createUser(req, res) {
-  const { nome, id_tipo_usuario, dt_nascimento, rg, cpf, estado_civil, sexo,
-    endereco, num_endereco, complemento, cidade, bairro, cep,
-    naturalidade, nacionalidade, raca, telefone, celular, profissao,
-    local_trabalho, email, instagram, facebook } = req.body;
+export async function createUser(req, res) {
+  let {
+    nome,
+    id_tipo_usuario,
+    dt_nascimento,
+    rg,
+    cpf,
+    estado_civil,
+    sexo,
+    endereco,
+    num_endereco,
+    complemento,
+    cidade,
+    bairro,
+    cep,
+    naturalidade,
+    nacionalidade,
+    raca,
+    filhos,
+    telefone,
+    celular,
+    profissao,
+    local_trabalho,
+    email,
+    instagram,
+    facebook
+  } = req.body;
 
-  const senhaRandom = generateRandomPassword();
-  const senha = await bcrypt.hash(senhaRandom, 10);
-
-  const usuario = Usuario.build({ nome, id_tipo_usuario, dt_nascimento, senha, rg, cpf, estado_civil, sexo, endereco, num_endereco, complemento, cidade, bairro, cep, naturalidade, nacionalidade, raca, telefone, celular, profissao, local_trabalho, email, instagram, facebook, ic_ativo: true });
+  console.log('reqbidy', req.body)
 
   try {
+
+    const payload = {
+      nome,
+      id_tipo_usuario: parseInt(id_tipo_usuario, 10),
+      filhos: filhos !== undefined && filhos !== ''
+        ? parseInt(filhos, 10)
+        : null,
+      dt_nascimento: dt_nascimento && /^\d{4}-\d{2}-\d{2}$/.test(dt_nascimento)
+        ? dt_nascimento
+        : null,
+      rg,
+      cpf,
+      estado_civil,
+      sexo,
+      endereco,
+      num_endereco,
+      complemento,
+      cidade,
+      bairro,
+      cep,
+      naturalidade,
+      nacionalidade,
+      raca,
+      telefone,
+      celular,
+      profissao,
+      local_trabalho,
+      email,
+      instagram,
+      facebook
+    };
+
+    const senhaRandom = generateRandomPassword();
+    const senha = await bcrypt.hash(senhaRandom, 10);
+
+    const usuario = Usuario.build({
+      ...payload,
+      senha,
+      ic_ativo: true
+    });
+     console.log('senha', senhaRandom)
+
     await usuario.validate();
-  } catch (error) {
-    return res.status(400).json({ error: 'Informações de usuário inválidas: ' + error.message });
-  }
-
-  try {
     await usuario.save();
+    
+    const userData = usuario.toJSON();
+    return res.status(201).json({
+      ...userData,
+      senha: senhaRandom
+    });
+
+   
+
   } catch (error) {
-    return res.status(500).json({ error: 'Erro ao criar usuário: ' + error.message });
+    if (error.name === 'SequelizeValidationError') {
+      return res
+        .status(400)
+        .json({ error: 'Dados inválidos: ' + error.errors.map(e => e.message).join('; ') });
+    }
+    console.error(error);
+    return res.status(500).json({ error: 'Erro interno: ' + error.message });
   }
-
-
-  const mailOptions = {
-    from: '',
-    to: usuario.email,
-    subject: '',
-    html: `
-      <h2>Parabéns!</h2>
-      <p></p>
-      <p>
-        <strong>E-mail:</strong> <strong>${usuario.email}</strong><br>
-        <strong>Senha:</strong> <strong>${senhaRandom}</strong>
-      </p>
-    `,
-    attachments: [
-      {
-        filename: '',
-        path: '',
-        cid: ''
-      }
-    ]
-  };
-
-  //await transporter.sendMail(mailOptions);
-
 }
-
 async function getUsers(req, res) {
 
   const limit = req.query.limit ? parseInt(req.query.limit) : null;

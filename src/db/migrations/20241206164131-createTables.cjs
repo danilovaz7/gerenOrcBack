@@ -106,6 +106,11 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true,
       },
+       filhos: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      
       telefone: {
         type: Sequelize.STRING,
         allowNull: true,

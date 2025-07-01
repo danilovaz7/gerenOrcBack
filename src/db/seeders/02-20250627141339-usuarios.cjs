@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
-  const usuarios =  [
+  async up(queryInterface, Sequelize) {
+    const usuarios = [
       {
         nome: 'Camila Leutz',
         email: 'doc@gmail.com',
@@ -17,20 +17,21 @@ module.exports = {
         estado_civil: 'solteiro',
         sexo: 'fem',
         endereco: 'Rua amarela',
-        num_endereco:'22',
-        complemento:'casa 2',
-        cidade:'Santos',
-        bairro:'Macuco',
-        cep:'11030560',
-        naturalidade:'Brasi',
-        nacionalidade:'Brasileira',
-        raca:'branca',
-        telefone:'32325467',
-        celular:'998817246',
-        profissao:'Médica',
-        local_trabalho:'Rua vermelha, 12',
-        instagram:'doc_camila',
-        facebook:'Camila Leutz',
+        num_endereco: '22',
+        complemento: 'casa 2',
+        cidade: 'Santos',
+        bairro: 'Macuco',
+        cep: '11030560',
+        naturalidade: 'Brasi',
+        nacionalidade: 'Brasileira',
+        raca: 'branca',
+        filhos: 2,
+        telefone: '32325467',
+        celular: '998817246',
+        profissao: 'Médica',
+        local_trabalho: 'Rua vermelha, 12',
+        instagram: 'doc_camila',
+        facebook: 'Camila Leutz',
         ic_ativo: 1,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -45,7 +46,7 @@ module.exports = {
     await queryInterface.bulkInsert('usuarios', usuarios);
   },
 
-  async down (queryInterface, Sequelize) {
-      await queryInterface.bulkDelete('usuarios', null);
+  async down(queryInterface, Sequelize) {
+    await queryInterface.bulkDelete('usuarios', null);
   }
 };
