@@ -3,6 +3,7 @@ import Usuario from "../models/Usuario.js";
 import TipoUsuario from "../models/TipoUsuario.js";
 import generator from "generate-password";
 import bcrypt from 'bcryptjs';
+import { Op } from 'sequelize';
 //import transporter from '../services/email.js';
 
 export function generateRandomPassword() {
@@ -42,8 +43,6 @@ export async function createUser(req, res) {
     instagram,
     facebook
   } = req.body;
-
-  console.log('reqbidy', req.body)
 
   try {
 
@@ -86,18 +85,18 @@ export async function createUser(req, res) {
       senha,
       ic_ativo: true
     });
-     console.log('senha', senhaRandom)
+    console.log('senha', senhaRandom)
 
     await usuario.validate();
     await usuario.save();
-    
+
     const userData = usuario.toJSON();
     return res.status(201).json({
       ...userData,
       senha: senhaRandom
     });
 
-   
+
 
   } catch (error) {
     if (error.name === 'SequelizeValidationError') {
@@ -109,30 +108,27 @@ export async function createUser(req, res) {
     return res.status(500).json({ error: 'Erro interno: ' + error.message });
   }
 }
-async function getUsers(req, res) {
 
-  const limit = req.query.limit ? parseInt(req.query.limit) : null;
-  const orderField = req.query.order ? req.query.order : null;
-  let orderDirection = req.query.orderDirection ? req.query.orderDirection : 'DESC';
+export async function getUsers(req, res) {
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+  const nomeQuery = req.query.nome || null;
 
-  if (orderField === 'nome') {
-    orderDirection = 'ASC';
+  const where = { id_tipo_usuario: 2 };
+  if (nomeQuery) {
+    where.nome = {
+      [Op.like]: `%${nomeQuery}%`  
+    };
   }
 
-  const queryOptions = {
-    where: { tipo_usuario_id: 2 },
-  };
-
-  if (limit !== null) {
-    queryOptions.limit = limit;
-  }
-
+  const queryOptions = { where };
+  if (limit !== null) queryOptions.limit = limit;
 
   try {
     const usuarios = await Usuario.findAll(queryOptions);
-    res.json(Array.isArray(usuarios));
+    return res.json(usuarios);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar usuários', message: error.message });
+    console.error('Erro ao buscar usuários:', error);
+    return res.status(500).json({ error: 'Erro ao buscar usuários', message: error.message });
   }
 }
 
@@ -162,8 +158,8 @@ async function getTipoUsuarios(req, res) {
 async function updateUser(req, res) {
   const { id } = req.params
   const { nome, dt_nascimento, estado_civil,
-    sexo, endereco, num_endereco, complemento, cidade, bairro, cep,
-    naturalidade, nacionalidade, raca, telefone, celular, profissao,
+    sexo, endereco, num_endereco, complemento, cidade,rg,cpf, bairro, cep,
+    naturalidade, nacionalidade, raca, telefone, celular, profissao,filhos,
     local_trabalho, email, instagram, facebook, senha } = req.body;
 
   const usuario = await Usuario.findByPk(id)
@@ -181,6 +177,9 @@ async function updateUser(req, res) {
   if (dt_nascimento) usuario.dt_nascimento = dt_nascimento
   if (estado_civil) usuario.estado_civil = estado_civil
   if (sexo) usuario.sexo = sexo
+    if (rg) usuario.rg = rg
+     if (cpf) usuario.cpf = cpf
+     if (filhos) usuario.filhos = filhos
   if (endereco) usuario.endereco = endereco
   if (num_endereco) usuario.num_endereco = num_endereco
   if (complemento) usuario.complemento = complemento
