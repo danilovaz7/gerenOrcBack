@@ -2,15 +2,43 @@ import Usuario from './Usuario.js';
 import TipoUsuario from './TipoUsuario.js';
 import UsuarioAnamnese from './UsuarioAnamnese.js';
 import UsuarioExameComplementar from './UsuarioExameComplementar.js';
+import Orcamento from './Orcamento.js';
+import OrcamentoProcedimento from './OrcamentoProcedimento.js';
 
-// TipoUsuario ↔ Usuario
 TipoUsuario.hasMany(Usuario, { foreignKey: 'id_tipo_usuario', as: 'usuarios' });
 Usuario.belongsTo(TipoUsuario, { foreignKey: 'id_tipo_usuario', as: 'tipo_usuario' });
 
-// Usuario ↔ Anamnese (1:1)
 Usuario.hasOne(UsuarioAnamnese, { foreignKey: 'usuario_id', as: 'anamnese' });
 UsuarioAnamnese.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
 
-// Usuario ↔ Exames Complementares (1:1)
-Usuario.hasOne(UsuarioExameComplementar, { foreignKey: 'usuario_id', as: 'examesComplementares' });
-UsuarioExameComplementar.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+
+Usuario.hasOne(UsuarioExameComplementar, {
+  foreignKey: 'usuario_id',
+  as: 'examesComplementares'
+});
+UsuarioExameComplementar.belongsTo(Usuario, {
+  foreignKey: 'usuario_id',
+  as: 'usuario'
+});
+
+Usuario.hasMany(Orcamento, { foreignKey: 'usuario_id', as: 'orcamentos' });
+Orcamento.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+
+Orcamento.hasMany(OrcamentoProcedimento, {
+  foreignKey: 'orcamento_id',
+  as: 'procedimentos'
+});
+OrcamentoProcedimento.belongsTo(Orcamento, {
+  foreignKey: 'orcamento_id',
+  as: 'orcamento'
+});
+
+Usuario.hasMany(OrcamentoProcedimento, {
+  foreignKey: 'usuario_id',
+  as: 'procedimentosOrcamento'
+});
+OrcamentoProcedimento.belongsTo(Usuario, {
+  foreignKey: 'usuario_id',
+  as: 'usuario'
+});
+

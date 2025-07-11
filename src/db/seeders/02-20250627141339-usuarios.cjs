@@ -36,6 +36,36 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       },
+         {
+        nome: 'Gabriel Deodoro',
+        email: 'gab@gmail.com',
+        senha: '111',
+        cpf: '6756869',
+        rg: '153456345',
+        id_tipo_usuario: 2,
+        dt_nascimento: new Date(),
+        estado_civil: 'Casasdo',
+        sexo: 'masc',
+        endereco: 'Rua betania',
+        num_endereco: '142',
+        complemento: 'apt 12',
+        cidade: 'Santos',
+        bairro: 'Ponta da Praia',
+        cep: '11030290',
+        naturalidade: 'Brasi',
+        nacionalidade: 'Brasileira',
+        raca: 'branca',
+        filhos: 0,
+        telefone: '32329102',
+        celular: '13 991012398',
+        profissao: 'Cozinheiro',
+        local_trabalho: 'Rua das almondegas, 45',
+        instagram: 'deod_gab',
+        facebook: 'Gabriel Deodoro Fonseca',
+        ic_ativo: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
     ]
 
     for (let usuario of usuarios) {

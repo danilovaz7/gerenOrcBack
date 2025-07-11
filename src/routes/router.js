@@ -8,6 +8,7 @@ import Usuario from '../models/Usuario.js';
 
 import { authenticate } from '../services/authService.js'
 import usuariosController from '../controllers/usuariosController.js'
+import orcamentoController from '../controllers/orcamentoController.js';
 import loginController from '../controllers/loginController.js'
 
 const router = Router()
@@ -17,6 +18,8 @@ router.get('/usuarios', usuariosController.getUsers)
 router.get('/usuarios/:id', authenticate,usuariosController.getUserById)
 router.put('/usuarios/:id', authenticate, usuariosController.updateUser)
 router.delete('/usuarios/:id', authenticate,usuariosController.deleteUser)
+
+router.post('/orcamentos', orcamentoController.createOrcamento)
 
 router.post('/login',loginController.login)
 router.get('/eu', pegarUsuarioDoToken)
