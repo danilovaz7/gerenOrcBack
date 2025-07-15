@@ -1,23 +1,24 @@
-import { Sequelize } from 'sequelize';
+
 import Usuario from "../models/Usuario.js";
 import TipoUsuario from "../models/TipoUsuario.js";
-import { Op } from 'sequelize';
-import { Where } from 'sequelize/lib/utils';
+import { Op, fn, col } from 'sequelize';
 import Orcamento from '../models/Orcamento.js';
 import OrcamentoProcedimento from '../models/OrcamentoProcedimento.js';
+import fs from 'fs';
+import path from 'path';
+import { gerarPdfOrcamento } from '../utils/gerarPdfOrcamento.js';
+
+
+
 
 export async function createOrcamento(req, res) {
     const sequelize = Orcamento.sequelize;
-    console.log('entramo aqui pae')
     const {
         usuario_id,
         forma_pagamento,
         valor_total,
-        arquivo_pdf,
         procedimentos = []
     } = req.body;
-
-    console.log(req.body)
 
     const t = await sequelize.transaction();
 
@@ -26,7 +27,7 @@ export async function createOrcamento(req, res) {
             usuario_id,
             forma_pagamento,
             valor_total,
-            arquivo_pdf
+            arquivo_pdf: null
         }, { transaction: t });
 
         const pros = procedimentos.map(p => ({
@@ -34,16 +35,39 @@ export async function createOrcamento(req, res) {
             valor_procedimento: p.valor_procedimento,
             orcamento_id: orcamento.id,
             obs_procedimento: p.obs_procedimento,
-            usuario_id: usuario_id,
+            usuario_id,
             foto_antes: p.foto_antes,
             foto_depois: p.foto_depois,
-            status_retorno: p.status_retorno,    
-            num_retorno: p.num_retorno,       
-            dt_realizacao: p.dt_realizacao,       
-            dt_ultimo_retorno: p.dt_ultimo_retorno   
+            status_retorno: p.status_retorno,
+            num_retorno: p.num_retorno,
+            dt_realizacao: p.dt_realizacao,
+            dt_ultimo_retorno: p.dt_ultimo_retorno
         }));
-      
         await OrcamentoProcedimento.bulkCreate(pros, { transaction: t });
+
+        const usuario = await Usuario.findByPk(usuario_id, { transaction: t });
+        const nomeUsuario = usuario?.nome || 'Desconhecido';
+
+        const logoPath = path.resolve('public', 'imgs', 'logo.PNG');
+        const logoDataUrl = fs.existsSync(logoPath)
+            ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
+            : null;
+
+        const bufferPDF = await gerarPdfOrcamento(
+            { forma_pagamento, valor_total, logo: logoDataUrl },
+            procedimentos,
+            nomeUsuario,
+            orcamento.createdAt
+        );
+
+        const nomeArquivo = `orcamento-${orcamento.id}-${Date.now()}.pdf`;
+        const dirPdf = path.resolve('public', 'pdfs');
+        if (!fs.existsSync(dirPdf)) fs.mkdirSync(dirPdf, { recursive: true });
+        const caminhoPdf = path.join(dirPdf, nomeArquivo);
+        fs.writeFileSync(caminhoPdf, bufferPDF);
+
+        orcamento.arquivo_pdf = `/pdfs/${nomeArquivo}`;
+        await orcamento.save({ transaction: t });
 
         await t.commit();
         return res.status(201).json({
@@ -53,33 +77,61 @@ export async function createOrcamento(req, res) {
     } catch (err) {
         await t.rollback();
         console.error(err);
-        return res.status(500).json({ error: 'Falha ao criar orçamento' });
+        return res.status(500).json({ error: 'Falha ao criar orçamento e gerar PDF' });
     }
 }
-
 
 export async function getOrcamentos(req, res) {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
-    const nomeQuery = req.query.nome || null;
+    const nomePaciente = req.query.nome || null;
+
+    let usuarioIds = null;
+    if (nomePaciente) {
+        const usuarios = await Usuario.findAll({
+            where: {
+                nome: { [Op.like]: `%${nomePaciente}%` }
+            },
+            attributes: ['id']
+        });
+        usuarioIds = usuarios.map(u => u.id);
+        if (usuarioIds.length === 0) {
+            return res.json([]);
+        }
+    }
 
     const where = {};
-    if (nomeQuery) {
-        where.nome = {
-            [Op.like]: `%${nomeQuery}%`
-        };
+    if (usuarioIds) {
+        where.usuario_id = { [Op.in]: usuarioIds };
     }
-
-    const queryOptions = { where };
-    if (limit !== null) queryOptions.limit = limit;
 
     try {
-        const usuarios = await Usuario.findAll(queryOptions);
-        return res.json(usuarios);
+        const orcamentos = await Orcamento.findAll({
+            where,
+            attributes: {
+                include: [
+                    [fn('COUNT', col('procedimentos.id')), 'procedimentosCount']
+                ]
+            },
+            include: [
+                {
+                    model: OrcamentoProcedimento,
+                    as: 'procedimentos',
+                    attributes: []
+                }
+            ],
+            group: ['Orcamento.id'],
+            ...(limit != null ? { limit } : {})
+        });
+
+        return res.json(orcamentos);
     } catch (error) {
-        console.error('Erro ao buscar usuários:', error);
-        return res.status(500).json({ error: 'Erro ao buscar usuários', message: error.message });
+        console.error('Erro ao buscar orçamentos:', error);
+        return res
+            .status(500)
+            .json({ error: 'Erro ao buscar orçamentos', message: error.message });
     }
 }
+
 
 export async function getUserById(req, res) {
     const { id } = req.params;
@@ -164,5 +216,5 @@ async function deleteUser(req, res) {
 
 export default {
     createOrcamento,
-  
+    getOrcamentos,
 }

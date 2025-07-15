@@ -20,6 +20,7 @@ router.put('/usuarios/:id', authenticate, usuariosController.updateUser)
 router.delete('/usuarios/:id', authenticate,usuariosController.deleteUser)
 
 router.post('/orcamentos', orcamentoController.createOrcamento)
+router.get('/orcamentos', orcamentoController.getOrcamentos)
 
 router.post('/login',loginController.login)
 router.get('/eu', pegarUsuarioDoToken)

@@ -151,6 +151,8 @@ async function updateUser(req, res) {
     sexo, endereco, num_endereco, complemento, cidade, rg, cpf, bairro, cep,
     naturalidade, nacionalidade, raca, telefone, celular, profissao, filhos,
     local_trabalho, email, instagram, facebook, senha, anamnese, examesComplementares } = req.body;
+    console.log('bateiiiii')
+    console.log('req.body', req.body)
 
   const usuario = await Usuario.findByPk(id)
   const usuarioAnamnese = await UsuarioAnamnese.findOne({ where: { usuario_id: usuario.id } });
