@@ -21,6 +21,10 @@ router.delete('/usuarios/:id', authenticate,usuariosController.deleteUser)
 
 router.post('/orcamentos', orcamentoController.createOrcamento)
 router.get('/orcamentos', orcamentoController.getOrcamentos)
+router.get('/proximos-procedimentos', orcamentoController.getProximosProcedimentos)
+router.get('/procedimentos', orcamentoController.getProcedimentos)
+router.get('/procedimento/:idProcedimento', orcamentoController.getProcedimentoById)
+router.put('/procedimento/:idProcedimento', orcamentoController.updateProcedimento)
 
 router.post('/login',loginController.login)
 router.get('/eu', pegarUsuarioDoToken)

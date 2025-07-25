@@ -8,9 +8,6 @@ import fs from 'fs';
 import path from 'path';
 import { gerarPdfOrcamento } from '../utils/gerarPdfOrcamento.js';
 
-
-
-
 export async function createOrcamento(req, res) {
     const sequelize = Orcamento.sequelize;
     const {
@@ -132,6 +129,143 @@ export async function getOrcamentos(req, res) {
     }
 }
 
+export async function getProximosProcedimentos(req, res) {
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 5;
+  const nomePaciente = req.query.nome || null;
+
+  // hoje em YYYY-MM-DD para DATEONLY
+  const hojeStr = new Date().toISOString().slice(0, 10);
+
+  // filtra dt_realizacao >= hoje
+  const where = {
+    dt_realizacao: { [Op.gte]: hojeStr }
+  };
+
+  // monta include de Orcamento -> Usuario
+  const usuarioInclude = {
+    model: Usuario,
+    as: 'usuario',
+    attributes: ['id', 'nome'],
+    ...(nomePaciente
+      ? {
+          where: { nome: { [Op.like]: `%${nomePaciente}%` } },
+          required: true
+        }
+      : {
+          required: false
+        })
+  };
+
+  const include = [
+    {
+      model: Orcamento,
+      as: 'orcamento',
+      include: [usuarioInclude]
+    }
+  ];
+
+  try {
+    const proximos = await OrcamentoProcedimento.findAll({
+      where,
+      include,
+      order: [['dt_realizacao', 'ASC']],
+      limit
+    });
+    return res.json(proximos);
+  } catch (error) {
+    console.error('Erro ao buscar próximos procedimentos:', error);
+    return res.status(500).json({
+      error: 'Erro ao buscar próximos procedimentos',
+      message: error.message
+    });
+  }
+}
+
+
+export async function getProcedimentos(req, res) {
+    const { nome, status, dt_realizacao } = req.query;
+
+    const usuarioInclude = {
+        model: Usuario,
+        as: 'usuario',
+        attributes: ['id', 'nome'],
+        required: Boolean(nome),
+        where: nome
+            ? { nome: { [Op.like]: `%${nome}%` } }
+            : undefined
+    };
+
+    const include = [
+        {
+            model: Orcamento,
+            as: 'orcamento',
+            include: [usuarioInclude]
+        }
+    ];
+    const where = {};
+
+    if (status) {
+        where.status_retorno = { [Op.like]: `%${status}%` };
+    }
+
+    if (dt_realizacao) {
+        const dateOnly = dt_realizacao.slice(0, 10);
+        where.dt_realizacao = { [Op.eq]: dateOnly };
+    }
+    try {
+        const procedimentos = await OrcamentoProcedimento.findAll({
+            include,
+            where,
+            order: [['dt_realizacao', 'DESC']]
+        });
+        return res.json(procedimentos);
+    } catch (error) {
+        console.error('Erro ao buscar procedimentos:', error);
+        return res.status(500).json({
+            error: 'Erro ao buscar procedimentos',
+            message: error.message
+        });
+    }
+}
+
+export async function getProcedimentoById(req, res) {
+    const { idProcedimento } = req.params;
+
+    const include = [
+        {
+            model: Orcamento,
+            as: 'orcamento',
+            include: [
+                {
+                    model: Usuario,
+                    as: 'usuario',
+                    attributes: ['id', 'nome']
+                }
+            ]
+        }
+    ];
+
+    try {
+        const procedimento = await OrcamentoProcedimento.findOne({
+            where: { id: idProcedimento },
+            include
+        });
+
+        if (!procedimento) {
+            return res.status(404).json({ error: 'Procedimento não encontrado' });
+        }
+
+        return res.json(procedimento);
+    } catch (error) {
+        console.error('Erro ao buscar procedimento:', error);
+        return res.status(500).json({
+            error: 'Erro ao buscar procedimento',
+            message: error.message
+        });
+    }
+}
+
+
 
 export async function getUserById(req, res) {
     const { id } = req.params;
@@ -164,36 +298,40 @@ async function getTipoUsuarios(req, res) {
     }
 }
 
-async function updateUser(req, res) {
-    const { id } = req.params
-    const { nome } = req.body;
+async function updateProcedimento(req, res) {
+    const { idProcedimento } = req.params
+    const { status_retorno, dt_realizacao, num_retorno, obs_procedimento } = req.body;
 
-    const usuario = await Usuario.findByPk(id)
+    const procedimento = await OrcamentoProcedimento.findByPk(idProcedimento)
 
-    if (!usuario) {
-        return res.status(404).json({ error: 'Usuário não encontrado' })
+    if (!procedimento) {
+        return res.status(404).json({ error: 'procedimento não encontrado' })
     }
 
-    if (nome) usuario.nome = nome
+    if (status_retorno) procedimento.status_retorno = status_retorno
+    if (dt_realizacao) procedimento.dt_realizacao = dt_realizacao
+    if (num_retorno) procedimento.num_retorno = num_retorno
+    if (obs_procedimento) procedimento.obs_procedimento = obs_procedimento
+    procedimento.dt_ultimo_retorno = new Date()
+
 
     try {
-        await usuario.validate();
+        await procedimento.validate();
     } catch (err) {
-        return res.status(400).json({ error: 'usuario inválida: ' + err.message });
+        return res.status(400).json({ error: 'procedimento inválida: ' + err.message });
     }
 
     try {
-        await usuario.save();
+        await procedimento.save();
     } catch (err) {
-        console.error('Erro ao salvar anamnese:', err);
+        console.error('Erro ao salvar procedimento:', err);
         return res
             .status(500)
-            .json({ error: 'Erro ao salvar usuario: ' + err.message });
+            .json({ error: 'Erro ao salvar procedimento: ' + err.message });
     }
 
-
     return res.json({
-        usuario: usuario.toJSON(),
+        procedimento: procedimento.toJSON(),
     });
 }
 
@@ -217,4 +355,8 @@ async function deleteUser(req, res) {
 export default {
     createOrcamento,
     getOrcamentos,
+    getProximosProcedimentos,
+    getProcedimentos,
+    getProcedimentoById,
+    updateProcedimento
 }

@@ -1,13 +1,15 @@
-import { Sequelize } from 'sequelize';
+import generator from "generate-password";
+import bcrypt from 'bcryptjs';
+import { Op, fn, col } from 'sequelize';
+import { Where } from 'sequelize/lib/utils';
+//import transporter from '../services/email.js';
+
 import Usuario from "../models/Usuario.js";
 import UsuarioAnamnese from '../models/UsuarioAnamnese.js';
 import UsuarioExameComplementar from '../models/UsuarioExameComplementar.js';
 import TipoUsuario from "../models/TipoUsuario.js";
-import generator from "generate-password";
-import bcrypt from 'bcryptjs';
-import { Op } from 'sequelize';
-import { Where } from 'sequelize/lib/utils';
-//import transporter from '../services/email.js';
+import Orcamento from "../models/Orcamento.js";
+import OrcamentoProcedimento from "../models/OrcamentoProcedimento.js";
 
 export function generateRandomPassword() {
   return generator.generate({
@@ -21,8 +23,8 @@ export function generateRandomPassword() {
 
 export async function createUser(req, res) {
   let {
-    nome,id_tipo_usuario,dt_nascimento,rg,cpf,estado_civil,sexo,endereco,num_endereco,complemento,cidade,bairro,
-    cep,naturalidade,nacionalidade,raca,filhos,telefone,celular,profissao,local_trabalho,email,instagram,facebook
+    nome, id_tipo_usuario, dt_nascimento, rg, cpf, estado_civil, sexo, endereco, num_endereco, complemento, cidade, bairro,
+    cep, naturalidade, nacionalidade, raca, filhos, telefone, celular, profissao, local_trabalho, email, instagram, facebook
   } = req.body;
 
   try {
@@ -56,11 +58,11 @@ export async function createUser(req, res) {
       facebook
     };
 
-   
+
     const senhaRandom = generateRandomPassword();
     const senhaHash = await bcrypt.hash(senhaRandom, 10);
 
- 
+
     const usuario = Usuario.build({
       ...payload,
       senha: senhaHash,
@@ -68,8 +70,8 @@ export async function createUser(req, res) {
     });
     await usuario.validate();
     await usuario.save();
-    
-    await UsuarioAnamnese.create({ usuario_id: usuario.id,pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE',anemia: 'NÃO SABE',hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
+
+    await UsuarioAnamnese.create({ usuario_id: usuario.id, pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE', anemia: 'NÃO SABE', hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
     await UsuarioExameComplementar.create({ usuario_id: usuario.id });
 
     const userData = usuario.toJSON();
@@ -89,29 +91,50 @@ export async function createUser(req, res) {
   }
 }
 
-
 export async function getUsers(req, res) {
   const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
   const nomeQuery = req.query.nome || null;
 
   const where = { id_tipo_usuario: 2 };
   if (nomeQuery) {
-    where.nome = {
-      [Op.like]: `%${nomeQuery}%`
-    };
+    where.nome = { [Op.like]: `%${nomeQuery}%` };
   }
 
-  const queryOptions = { where };
-  if (limit !== null) queryOptions.limit = limit;
-
   try {
-    const usuarios = await Usuario.findAll(queryOptions);
+    const usuarios = await Usuario.findAll({
+      where,
+      attributes: {
+        include: [
+          [fn('COUNT', fn('DISTINCT', col('orcamentos.id'))), 'orcamentosCount'],
+          [fn('COUNT', fn('DISTINCT', col('procedimentosOrcamento.id'))), 'procedimentosCount'],
+          [fn('MAX', col('procedimentosOrcamento.dt_ultimo_retorno')), 'ultimoRetorno']
+        ]
+      },
+      include: [
+        {
+          model: Orcamento,
+          as: 'orcamentos',
+          attributes: [] 
+        },
+        {
+          model: OrcamentoProcedimento,
+          as: 'procedimentosOrcamento',
+          attributes: []  
+        }
+      ],
+      group: ['usuarios.id'],
+      ...(limit !== null ? { limit } : {})
+    });
+
     return res.json(usuarios);
   } catch (error) {
     console.error('Erro ao buscar usuários:', error);
-    return res.status(500).json({ error: 'Erro ao buscar usuários', message: error.message });
+    return res
+      .status(500)
+      .json({ error: 'Erro ao buscar usuários', message: error.message });
   }
 }
+
 
 export async function getUserById(req, res) {
   const { id } = req.params;
@@ -151,8 +174,8 @@ async function updateUser(req, res) {
     sexo, endereco, num_endereco, complemento, cidade, rg, cpf, bairro, cep,
     naturalidade, nacionalidade, raca, telefone, celular, profissao, filhos,
     local_trabalho, email, instagram, facebook, senha, anamnese, examesComplementares } = req.body;
-    console.log('bateiiiii')
-    console.log('req.body', req.body)
+  console.log('bateiiiii')
+  console.log('req.body', req.body)
 
   const usuario = await Usuario.findByPk(id)
   const usuarioAnamnese = await UsuarioAnamnese.findOne({ where: { usuario_id: usuario.id } });

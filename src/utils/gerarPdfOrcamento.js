@@ -6,11 +6,9 @@ import pdfFonts from 'pdfmake/build/vfs_fonts.js'
 
 pdfMake.vfs = pdfFonts.vfs
 
-// === define __dirname em ES Modules ===
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// === função que carrega o template via fs e retorna DataURL ===
 function carregarTemplateDataUrl() {
   const templatePath = path.resolve(__dirname, '../../public/imgs/template.JPG')
   const arquivo = fs.readFileSync(templatePath)
@@ -32,16 +30,12 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
 }
 
-/**
- * Gera um PDF de orçamento usando pdfMake, com imagem de template ao fundo.
- */
 export async function gerarPdfOrcamento(
   orcamento,
   procedimentos,
   nomeUsuario,
   dataCriacao
 ) {
-  // 1) Carrega o template do disco
   const templateDataUrl = carregarTemplateDataUrl()
 
   const formaPagCap = capitalize(orcamento.forma_pagamento)
@@ -58,10 +52,10 @@ export async function gerarPdfOrcamento(
     ],
     content: [
       {
-        text: 'Orçamento de Procedimentos',
+        text: 'Orçamento',
         style: 'header',
         alignment: 'center',
-        margin: [0, 80, 0, 20]   // [left, top, right, bottom]
+        margin: [0, 80, 0, 20]   
       },
       {
         text: `Nome do paciente: ${nomeUsuario}`, margin: [0, 0, 0, 5]
