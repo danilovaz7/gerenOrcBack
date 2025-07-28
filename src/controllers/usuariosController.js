@@ -62,6 +62,7 @@ export async function createUser(req, res) {
     const senhaRandom = generateRandomPassword();
     const senhaHash = await bcrypt.hash(senhaRandom, 10);
 
+    console.log('SENHA CARAI', senhaRandom)
 
     const usuario = Usuario.build({
       ...payload,
@@ -147,9 +148,11 @@ export async function getUserById(req, res) {
       ]
     });
 
+
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
+
 
     return res.json(usuario.toJSON());
   } catch (err) {

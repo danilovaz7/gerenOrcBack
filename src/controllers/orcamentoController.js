@@ -79,98 +79,86 @@ export async function createOrcamento(req, res) {
 }
 
 export async function getOrcamentos(req, res) {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
-    const nomePaciente = req.query.nome || null;
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+  const usuarioId = req.query.usuario_id
+    ? parseInt(req.query.usuario_id, 10)
+    : null;
 
-    let usuarioIds = null;
-    if (nomePaciente) {
-        const usuarios = await Usuario.findAll({
-            where: {
-                nome: { [Op.like]: `%${nomePaciente}%` }
-            },
-            attributes: ['id']
-        });
-        usuarioIds = usuarios.map(u => u.id);
-        if (usuarioIds.length === 0) {
-            return res.json([]);
+  // Monta o filtro; se vier usuarioId, aplica só nele
+  const where = {};
+  if (usuarioId) {
+    where.usuario_id = usuarioId;
+  }
+
+  try {
+    const orcamentos = await Orcamento.findAll({
+      where,
+      attributes: {
+        include: [
+          // Conta quantos procedimentos cada orçamento tem
+          [fn('COUNT', col('procedimentos.id')), 'procedimentosCount']
+        ]
+      },
+      include: [
+        {
+          model: OrcamentoProcedimento,
+          as: 'procedimentos',
+          attributes: []
         }
-    }
+      ],
+      group: ['Orcamento.id'],
+      // Aplica o limit apenas se vier na query
+      ...(limit != null ? { limit } : {})
+    });
 
-    const where = {};
-    if (usuarioIds) {
-        where.usuario_id = { [Op.in]: usuarioIds };
-    }
-
-    try {
-        const orcamentos = await Orcamento.findAll({
-            where,
-            attributes: {
-                include: [
-                    [fn('COUNT', col('procedimentos.id')), 'procedimentosCount']
-                ]
-            },
-            include: [
-                {
-                    model: OrcamentoProcedimento,
-                    as: 'procedimentos',
-                    attributes: []
-                }
-            ],
-            group: ['Orcamento.id'],
-            ...(limit != null ? { limit } : {})
-        });
-
-        return res.json(orcamentos);
-    } catch (error) {
-        console.error('Erro ao buscar orçamentos:', error);
-        return res
-            .status(500)
-            .json({ error: 'Erro ao buscar orçamentos', message: error.message });
-    }
+    return res.json(orcamentos);
+  } catch (error) {
+    console.error('Erro ao buscar orçamentos:', error);
+    return res
+      .status(500)
+      .json({ error: 'Erro ao buscar orçamentos', message: error.message });
+  }
 }
-
 export async function getProximosProcedimentos(req, res) {
   const limit = req.query.limit ? parseInt(req.query.limit, 10) : 5;
-  const nomePaciente = req.query.nome || null;
+  const usuarioId = req.query.usuario_id
+    ? parseInt(req.query.usuario_id, 10)
+    : null;
 
-  // hoje em YYYY-MM-DD para DATEONLY
   const hojeStr = new Date().toISOString().slice(0, 10);
-
-  // filtra dt_realizacao >= hoje
-  const where = {
-    dt_realizacao: { [Op.gte]: hojeStr }
-  };
-
-  // monta include de Orcamento -> Usuario
-  const usuarioInclude = {
-    model: Usuario,
-    as: 'usuario',
-    attributes: ['id', 'nome'],
-    ...(nomePaciente
-      ? {
-          where: { nome: { [Op.like]: `%${nomePaciente}%` } },
-          required: true
-        }
-      : {
-          required: false
-        })
-  };
-
-  const include = [
-    {
-      model: Orcamento,
-      as: 'orcamento',
-      include: [usuarioInclude]
-    }
-  ];
 
   try {
     const proximos = await OrcamentoProcedimento.findAll({
-      where,
-      include,
+      where: {
+        dt_realizacao: { [Op.gte]: hojeStr }
+      },
+      include: [
+        {
+          model: Orcamento,
+          as: 'orcamento',
+          // se vier usuarioId, aplica where e required,
+          // caso contrário traz todos (required: false)
+          ...(usuarioId
+            ? {
+                where: { usuario_id: usuarioId },
+                required: true
+              }
+            : {
+                required: false
+              }),
+          include: [
+            {
+              model: Usuario,
+              as: 'usuario',
+              attributes: ['id', 'nome']
+            }
+          ]
+        }
+      ],
       order: [['dt_realizacao', 'ASC']],
       limit
     });
+
     return res.json(proximos);
   } catch (error) {
     console.error('Erro ao buscar próximos procedimentos:', error);
@@ -183,50 +171,57 @@ export async function getProximosProcedimentos(req, res) {
 
 
 export async function getProcedimentos(req, res) {
-    const { nome, status, dt_realizacao } = req.query;
+  const { status, dt_realizacao } = req.query;
+  const usuarioId = req.query.usuario_id
+    ? parseInt(req.query.usuario_id, 10)
+    : null;
 
-    const usuarioInclude = {
-        model: Usuario,
-        as: 'usuario',
-        attributes: ['id', 'nome'],
-        required: Boolean(nome),
-        where: nome
-            ? { nome: { [Op.like]: `%${nome}%` } }
-            : undefined
-    };
-
-    const include = [
+  // Monta o include de Orcamento, aplicando filtro por usuário se necessário
+  const include = [
+    {
+      model: Orcamento,
+      as: 'orcamento',
+      // Se vier usuarioId, só orçamentos dele; senão, todos
+      ...(usuarioId
+        ? { where: { usuario_id: usuarioId }, required: true }
+        : { required: false }),
+      include: [
         {
-            model: Orcamento,
-            as: 'orcamento',
-            include: [usuarioInclude]
+          model: Usuario,
+          as: 'usuario',
+          attributes: ['id', 'nome']
         }
-    ];
-    const where = {};
+      ]
+    }
+  ];
 
-    if (status) {
-        where.status_retorno = { [Op.like]: `%${status}%` };
-    }
+  // Filtros de status e data
+  const where = {};
+  if (status) {
+    where.status_retorno = { [Op.like]: `%${status}%` };
+  }
+  if (dt_realizacao) {
+    // normaliza para YYYY‑MM‑DD
+    const onlyDate = dt_realizacao.slice(0, 10);
+    where.dt_realizacao = { [Op.eq]: onlyDate };
+  }
 
-    if (dt_realizacao) {
-        const dateOnly = dt_realizacao.slice(0, 10);
-        where.dt_realizacao = { [Op.eq]: dateOnly };
-    }
-    try {
-        const procedimentos = await OrcamentoProcedimento.findAll({
-            include,
-            where,
-            order: [['dt_realizacao', 'DESC']]
-        });
-        return res.json(procedimentos);
-    } catch (error) {
-        console.error('Erro ao buscar procedimentos:', error);
-        return res.status(500).json({
-            error: 'Erro ao buscar procedimentos',
-            message: error.message
-        });
-    }
+  try {
+    const procedimentos = await OrcamentoProcedimento.findAll({
+      include,
+      where,
+      order: [['dt_realizacao', 'DESC']]
+    });
+    return res.json(procedimentos);
+  } catch (error) {
+    console.error('Erro ao buscar procedimentos:', error);
+    return res.status(500).json({
+      error: 'Erro ao buscar procedimentos',
+      message: error.message
+    });
+  }
 }
+
 
 export async function getProcedimentoById(req, res) {
     const { idProcedimento } = req.params;

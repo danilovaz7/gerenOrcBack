@@ -36,7 +36,7 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       },
-         {
+      {
         nome: 'Gabriel Deodoro',
         email: 'gab@gmail.com',
         senha: '111',
