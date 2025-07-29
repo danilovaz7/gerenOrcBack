@@ -1,7 +1,8 @@
 
 import Usuario from "../models/Usuario.js";
 import TipoUsuario from "../models/TipoUsuario.js";
-import { Op, fn, col } from 'sequelize';
+import { Op, fn, col,where } from 'sequelize';
+
 import Orcamento from '../models/Orcamento.js';
 import OrcamentoProcedimento from '../models/OrcamentoProcedimento.js';
 import fs from 'fs';
@@ -9,73 +10,73 @@ import path from 'path';
 import { gerarPdfOrcamento } from '../utils/gerarPdfOrcamento.js';
 
 export async function createOrcamento(req, res) {
-    const sequelize = Orcamento.sequelize;
-    const {
-        usuario_id,
-        forma_pagamento,
-        valor_total,
-        procedimentos = []
-    } = req.body;
+  const sequelize = Orcamento.sequelize;
+  const {
+    usuario_id,
+    forma_pagamento,
+    valor_total,
+    procedimentos = []
+  } = req.body;
 
-    const t = await sequelize.transaction();
+  const t = await sequelize.transaction();
 
-    try {
-        const orcamento = await Orcamento.create({
-            usuario_id,
-            forma_pagamento,
-            valor_total,
-            arquivo_pdf: null
-        }, { transaction: t });
+  try {
+    const orcamento = await Orcamento.create({
+      usuario_id,
+      forma_pagamento,
+      valor_total,
+      arquivo_pdf: null
+    }, { transaction: t });
 
-        const pros = procedimentos.map(p => ({
-            nome_procedimento: p.nome_procedimento,
-            valor_procedimento: p.valor_procedimento,
-            orcamento_id: orcamento.id,
-            obs_procedimento: p.obs_procedimento,
-            usuario_id,
-            foto_antes: p.foto_antes,
-            foto_depois: p.foto_depois,
-            status_retorno: p.status_retorno,
-            num_retorno: p.num_retorno,
-            dt_realizacao: p.dt_realizacao,
-            dt_ultimo_retorno: p.dt_ultimo_retorno
-        }));
-        await OrcamentoProcedimento.bulkCreate(pros, { transaction: t });
+    const pros = procedimentos.map(p => ({
+      nome_procedimento: p.nome_procedimento,
+      valor_procedimento: p.valor_procedimento,
+      orcamento_id: orcamento.id,
+      obs_procedimento: p.obs_procedimento,
+      usuario_id,
+      foto_antes: p.foto_antes,
+      foto_depois: p.foto_depois,
+      status_retorno: p.status_retorno,
+      num_retorno: p.num_retorno,
+      dt_realizacao: p.dt_realizacao,
+      dt_ultimo_retorno: p.dt_ultimo_retorno
+    }));
+    await OrcamentoProcedimento.bulkCreate(pros, { transaction: t });
 
-        const usuario = await Usuario.findByPk(usuario_id, { transaction: t });
-        const nomeUsuario = usuario?.nome || 'Desconhecido';
+    const usuario = await Usuario.findByPk(usuario_id, { transaction: t });
+    const nomeUsuario = usuario?.nome || 'Desconhecido';
 
-        const logoPath = path.resolve('public', 'imgs', 'logo.PNG');
-        const logoDataUrl = fs.existsSync(logoPath)
-            ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
-            : null;
+    const logoPath = path.resolve('public', 'imgs', 'logo.PNG');
+    const logoDataUrl = fs.existsSync(logoPath)
+      ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
+      : null;
 
-        const bufferPDF = await gerarPdfOrcamento(
-            { forma_pagamento, valor_total, logo: logoDataUrl },
-            procedimentos,
-            nomeUsuario,
-            orcamento.createdAt
-        );
+    const bufferPDF = await gerarPdfOrcamento(
+      { forma_pagamento, valor_total, logo: logoDataUrl },
+      procedimentos,
+      nomeUsuario,
+      orcamento.createdAt
+    );
 
-        const nomeArquivo = `orcamento-${orcamento.id}-${Date.now()}.pdf`;
-        const dirPdf = path.resolve('public', 'pdfs');
-        if (!fs.existsSync(dirPdf)) fs.mkdirSync(dirPdf, { recursive: true });
-        const caminhoPdf = path.join(dirPdf, nomeArquivo);
-        fs.writeFileSync(caminhoPdf, bufferPDF);
+    const nomeArquivo = `orcamento-${orcamento.id}-${Date.now()}.pdf`;
+    const dirPdf = path.resolve('public', 'pdfs');
+    if (!fs.existsSync(dirPdf)) fs.mkdirSync(dirPdf, { recursive: true });
+    const caminhoPdf = path.join(dirPdf, nomeArquivo);
+    fs.writeFileSync(caminhoPdf, bufferPDF);
 
-        orcamento.arquivo_pdf = `/pdfs/${nomeArquivo}`;
-        await orcamento.save({ transaction: t });
+    orcamento.arquivo_pdf = `/pdfs/${nomeArquivo}`;
+    await orcamento.save({ transaction: t });
 
-        await t.commit();
-        return res.status(201).json({
-            message: 'Orçamento e procedimentos criados com sucesso',
-            orcamento
-        });
-    } catch (err) {
-        await t.rollback();
-        console.error(err);
-        return res.status(500).json({ error: 'Falha ao criar orçamento e gerar PDF' });
-    }
+    await t.commit();
+    return res.status(201).json({
+      message: 'Orçamento e procedimentos criados com sucesso',
+      orcamento
+    });
+  } catch (err) {
+    await t.rollback();
+    console.error(err);
+    return res.status(500).json({ error: 'Falha ao criar orçamento e gerar PDF' });
+  }
 }
 
 export async function getOrcamentos(req, res) {
@@ -83,23 +84,37 @@ export async function getOrcamentos(req, res) {
   const usuarioId = req.query.usuario_id
     ? parseInt(req.query.usuario_id, 10)
     : null;
+  const nomeFiltro = req.query.nome?.trim()?.toLowerCase();
 
-  // Monta o filtro; se vier usuarioId, aplica só nele
-  const where = {};
+  // Filtro padrão de orçamentos
+  const orcamentoWhere = {};
   if (usuarioId) {
-    where.usuario_id = usuarioId;
+    orcamentoWhere.usuario_id = usuarioId;
+  }
+
+  // Se houver filtro de nome, montamos a cláusula
+  const includeUsuario = {
+    model: Usuario,
+    as: 'usuario',
+    attributes: []
+  };
+  if (nomeFiltro) {
+    includeUsuario.where = where(
+      fn('LOWER', col('usuario.nome')),
+      { [Op.like]: `%${nomeFiltro}%` }
+    );
   }
 
   try {
     const orcamentos = await Orcamento.findAll({
-      where,
+      where: orcamentoWhere,
       attributes: {
         include: [
-          // Conta quantos procedimentos cada orçamento tem
           [fn('COUNT', col('procedimentos.id')), 'procedimentosCount']
         ]
       },
       include: [
+        includeUsuario,
         {
           model: OrcamentoProcedimento,
           as: 'procedimentos',
@@ -107,11 +122,11 @@ export async function getOrcamentos(req, res) {
         }
       ],
       group: ['Orcamento.id'],
-      // Aplica o limit apenas se vier na query
       ...(limit != null ? { limit } : {})
     });
 
-    return res.json(orcamentos);
+    // garantir que retornamos sempre um array
+    return res.json(Array.isArray(orcamentos) ? orcamentos : []);
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
     return res
@@ -119,6 +134,7 @@ export async function getOrcamentos(req, res) {
       .json({ error: 'Erro ao buscar orçamentos', message: error.message });
   }
 }
+
 export async function getProximosProcedimentos(req, res) {
   const limit = req.query.limit ? parseInt(req.query.limit, 10) : 5;
   const usuarioId = req.query.usuario_id
@@ -136,16 +152,14 @@ export async function getProximosProcedimentos(req, res) {
         {
           model: Orcamento,
           as: 'orcamento',
-          // se vier usuarioId, aplica where e required,
-          // caso contrário traz todos (required: false)
           ...(usuarioId
             ? {
-                where: { usuario_id: usuarioId },
-                required: true
-              }
+              where: { usuario_id: usuarioId },
+              required: true
+            }
             : {
-                required: false
-              }),
+              required: false
+            }),
           include: [
             {
               model: Usuario,
@@ -176,12 +190,10 @@ export async function getProcedimentos(req, res) {
     ? parseInt(req.query.usuario_id, 10)
     : null;
 
-  // Monta o include de Orcamento, aplicando filtro por usuário se necessário
   const include = [
     {
       model: Orcamento,
       as: 'orcamento',
-      // Se vier usuarioId, só orçamentos dele; senão, todos
       ...(usuarioId
         ? { where: { usuario_id: usuarioId }, required: true }
         : { required: false }),
@@ -195,13 +207,11 @@ export async function getProcedimentos(req, res) {
     }
   ];
 
-  // Filtros de status e data
   const where = {};
   if (status) {
     where.status_retorno = { [Op.like]: `%${status}%` };
   }
   if (dt_realizacao) {
-    // normaliza para YYYY‑MM‑DD
     const onlyDate = dt_realizacao.slice(0, 10);
     where.dt_realizacao = { [Op.eq]: onlyDate };
   }
@@ -224,134 +234,134 @@ export async function getProcedimentos(req, res) {
 
 
 export async function getProcedimentoById(req, res) {
-    const { idProcedimento } = req.params;
+  const { idProcedimento } = req.params;
 
-    const include = [
+  const include = [
+    {
+      model: Orcamento,
+      as: 'orcamento',
+      include: [
         {
-            model: Orcamento,
-            as: 'orcamento',
-            include: [
-                {
-                    model: Usuario,
-                    as: 'usuario',
-                    attributes: ['id', 'nome']
-                }
-            ]
+          model: Usuario,
+          as: 'usuario',
+          attributes: ['id', 'nome']
         }
-    ];
-
-    try {
-        const procedimento = await OrcamentoProcedimento.findOne({
-            where: { id: idProcedimento },
-            include
-        });
-
-        if (!procedimento) {
-            return res.status(404).json({ error: 'Procedimento não encontrado' });
-        }
-
-        return res.json(procedimento);
-    } catch (error) {
-        console.error('Erro ao buscar procedimento:', error);
-        return res.status(500).json({
-            error: 'Erro ao buscar procedimento',
-            message: error.message
-        });
+      ]
     }
+  ];
+
+  try {
+    const procedimento = await OrcamentoProcedimento.findOne({
+      where: { id: idProcedimento },
+      include
+    });
+
+    if (!procedimento) {
+      return res.status(404).json({ error: 'Procedimento não encontrado' });
+    }
+
+    return res.json(procedimento);
+  } catch (error) {
+    console.error('Erro ao buscar procedimento:', error);
+    return res.status(500).json({
+      error: 'Erro ao buscar procedimento',
+      message: error.message
+    });
+  }
 }
 
 
 
 export async function getUserById(req, res) {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    try {
-        const usuario = await Usuario.findByPk(id, {
-            /*include: [
-              { model: UsuarioAnamnese, as: 'anamnese' },
-            ]*/
-        });
+  try {
+    const usuario = await Usuario.findByPk(id, {
+      /*include: [
+        { model: UsuarioAnamnese, as: 'anamnese' },
+      ]*/
+    });
 
-        if (!usuario) {
-            return res.status(404).json({ error: 'Usuário não encontrado' });
-        }
-
-        return res.json(usuario.toJSON());
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Erro interno' });
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
     }
+
+    return res.json(usuario.toJSON());
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
 }
 
 async function getTipoUsuarios(req, res) {
-    const tipoUsuarios = await TipoUsuario.findAll()
+  const tipoUsuarios = await TipoUsuario.findAll()
 
-    if (tipoUsuarios) {
-        res.json(tipoUsuarios)
-    } else {
-        res.status(500).json({ error: 'Erro ao buscar tipoUsuarios' })
-    }
+  if (tipoUsuarios) {
+    res.json(tipoUsuarios)
+  } else {
+    res.status(500).json({ error: 'Erro ao buscar tipoUsuarios' })
+  }
 }
 
 async function updateProcedimento(req, res) {
-    const { idProcedimento } = req.params
-    const { status_retorno, dt_realizacao, num_retorno, obs_procedimento } = req.body;
+  const { idProcedimento } = req.params
+  const { status_retorno, dt_realizacao, num_retorno, obs_procedimento } = req.body;
 
-    const procedimento = await OrcamentoProcedimento.findByPk(idProcedimento)
+  const procedimento = await OrcamentoProcedimento.findByPk(idProcedimento)
 
-    if (!procedimento) {
-        return res.status(404).json({ error: 'procedimento não encontrado' })
-    }
+  if (!procedimento) {
+    return res.status(404).json({ error: 'procedimento não encontrado' })
+  }
 
-    if (status_retorno) procedimento.status_retorno = status_retorno
-    if (dt_realizacao) procedimento.dt_realizacao = dt_realizacao
-    if (num_retorno) procedimento.num_retorno = num_retorno
-    if (obs_procedimento) procedimento.obs_procedimento = obs_procedimento
-    procedimento.dt_ultimo_retorno = new Date()
+  if (status_retorno) procedimento.status_retorno = status_retorno
+  if (dt_realizacao) procedimento.dt_realizacao = dt_realizacao
+  if (num_retorno) procedimento.num_retorno = num_retorno
+  if (obs_procedimento) procedimento.obs_procedimento = obs_procedimento
+  procedimento.dt_ultimo_retorno = new Date()
 
 
-    try {
-        await procedimento.validate();
-    } catch (err) {
-        return res.status(400).json({ error: 'procedimento inválida: ' + err.message });
-    }
+  try {
+    await procedimento.validate();
+  } catch (err) {
+    return res.status(400).json({ error: 'procedimento inválida: ' + err.message });
+  }
 
-    try {
-        await procedimento.save();
-    } catch (err) {
-        console.error('Erro ao salvar procedimento:', err);
-        return res
-            .status(500)
-            .json({ error: 'Erro ao salvar procedimento: ' + err.message });
-    }
+  try {
+    await procedimento.save();
+  } catch (err) {
+    console.error('Erro ao salvar procedimento:', err);
+    return res
+      .status(500)
+      .json({ error: 'Erro ao salvar procedimento: ' + err.message });
+  }
 
-    return res.json({
-        procedimento: procedimento.toJSON(),
-    });
+  return res.json({
+    procedimento: procedimento.toJSON(),
+  });
 }
 
 async function deleteUser(req, res) {
-    const { id } = req.params
+  const { id } = req.params
 
-    const usuario = await Usuario.findByPk(id)
+  const usuario = await Usuario.findByPk(id)
 
-    if (!usuario) {
-        return res.status(404).json({ error: 'Usuário não encontrado' })
-    }
+  if (!usuario) {
+    return res.status(404).json({ error: 'Usuário não encontrado' })
+  }
 
-    try {
-        await usuario.destroy()
-        res.json({ message: 'Usuário excluído com sucesso' })
-    } catch (error) {
-        res.status(500).json({ error: 'Erro ao excluir usuário: ' + error.message })
-    }
+  try {
+    await usuario.destroy()
+    res.json({ message: 'Usuário excluído com sucesso' })
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir usuário: ' + error.message })
+  }
 }
 
 export default {
-    createOrcamento,
-    getOrcamentos,
-    getProximosProcedimentos,
-    getProcedimentos,
-    getProcedimentoById,
-    updateProcedimento
+  createOrcamento,
+  getOrcamentos,
+  getProximosProcedimentos,
+  getProcedimentos,
+  getProcedimentoById,
+  updateProcedimento
 }
