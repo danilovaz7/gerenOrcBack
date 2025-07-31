@@ -1,8 +1,7 @@
 import generator from "generate-password";
 import bcrypt from 'bcryptjs';
 import { Op, fn, col } from 'sequelize';
-import { Where } from 'sequelize/lib/utils';
-//import transporter from '../services/email.js';
+import transporter from '../services/email.js';
 
 import Usuario from "../models/Usuario.js";
 import UsuarioAnamnese from '../models/UsuarioAnamnese.js';
@@ -58,11 +57,8 @@ export async function createUser(req, res) {
       facebook
     };
 
-
     const senhaRandom = generateRandomPassword();
     const senhaHash = await bcrypt.hash(senhaRandom, 10);
-
-    console.log('SENHA CARAI', senhaRandom)
 
     const usuario = Usuario.build({
       ...payload,
@@ -71,6 +67,22 @@ export async function createUser(req, res) {
     });
     await usuario.validate();
     await usuario.save();
+
+    const mailOptions = {
+      from: 'equipeplay2learn@gmail.com',
+      to: usuario.email,
+      subject: 'Seja bem-vindo(a)',
+      html: `
+      <h2>Parabéns!</h2>
+      <p>Você foi cadastrado no sistema da <strong>Clínica Leutz</strong></p>
+       <p>É um prazer poder atender você!</strong></p>
+      <p>
+        <strong>E-mail:</strong> <strong>${usuario.email}</strong><br>
+        <strong>Senha:</strong> <strong>${senhaRandom}</strong>
+      </p>
+    `
+    };
+    await transporter.sendMail(mailOptions);
 
     await UsuarioAnamnese.create({ usuario_id: usuario.id, pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE', anemia: 'NÃO SABE', hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
     await UsuarioExameComplementar.create({ usuario_id: usuario.id });
@@ -115,12 +127,12 @@ export async function getUsers(req, res) {
         {
           model: Orcamento,
           as: 'orcamentos',
-          attributes: [] 
+          attributes: []
         },
         {
           model: OrcamentoProcedimento,
           as: 'procedimentosOrcamento',
-          attributes: []  
+          attributes: []
         }
       ],
       group: ['usuarios.id'],
