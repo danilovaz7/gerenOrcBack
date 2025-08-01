@@ -1,0 +1,48 @@
+# Node modules (não subir as dependências instaladas)
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de ambiente (contém senhas e chaves)
+.env
+.env.*
+
+# Cache de ferramentas
+.cache/
+.next/
+dist/
+build/
+.vscode/
+.idea/
+
+# Arquivos temporários
+tmp/
+temp/
+*.swp
+*.swo
+
+# Coverage de testes
+coverage/
+
+# Banco de dados local (caso use SQLite, por exemplo)
+*.sqlite
+*.sqlite3
+*.db
+
+# Pastas de upload (opcional)
+uploads/
+public/uploads/
+
+# Outros
+*.tgz
+*.pem

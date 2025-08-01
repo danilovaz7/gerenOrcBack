@@ -1,25 +1,21 @@
 
 import Usuario from "../models/Usuario.js";
 import TipoUsuario from "../models/TipoUsuario.js";
-import { Op, fn, col,where } from 'sequelize';
-
+import { Op, fn, col, where } from 'sequelize';
+import { uploadBuffer } from '../services/s3.js';
+import { uploadPdf, getPdfUrl } from '../services/s3.js';
 import Orcamento from '../models/Orcamento.js';
 import OrcamentoProcedimento from '../models/OrcamentoProcedimento.js';
 import fs from 'fs';
 import path from 'path';
 import { gerarPdfOrcamento } from '../utils/gerarPdfOrcamento.js';
+import { getUrl } from '../services/s3.js';
 
 export async function createOrcamento(req, res) {
   const sequelize = Orcamento.sequelize;
-  const {
-    usuario_id,
-    forma_pagamento,
-    valor_total,
-    procedimentos = []
-  } = req.body;
+  const { usuario_id, forma_pagamento, valor_total, procedimentos = [] } = req.body;
 
   const t = await sequelize.transaction();
-
   try {
     const orcamento = await Orcamento.create({
       usuario_id,
@@ -31,9 +27,9 @@ export async function createOrcamento(req, res) {
     const pros = procedimentos.map(p => ({
       nome_procedimento: p.nome_procedimento,
       valor_procedimento: p.valor_procedimento,
-      orcamento_id: orcamento.id,
       obs_procedimento: p.obs_procedimento,
       usuario_id,
+      orcamento_id: orcamento.id,
       foto_antes: p.foto_antes,
       foto_depois: p.foto_depois,
       status_retorno: p.status_retorno,
@@ -58,13 +54,10 @@ export async function createOrcamento(req, res) {
       orcamento.createdAt
     );
 
-    const nomeArquivo = `orcamento-${orcamento.id}-${Date.now()}.pdf`;
-    const dirPdf = path.resolve('public', 'pdfs');
-    if (!fs.existsSync(dirPdf)) fs.mkdirSync(dirPdf, { recursive: true });
-    const caminhoPdf = path.join(dirPdf, nomeArquivo);
-    fs.writeFileSync(caminhoPdf, bufferPDF);
+    const key = `orcamentos/${orcamento.id}-${Date.now()}.pdf`;
+    await uploadPdf(bufferPDF, key);
 
-    orcamento.arquivo_pdf = `/pdfs/${nomeArquivo}`;
+    orcamento.arquivo_pdf = key;
     await orcamento.save({ transaction: t });
 
     await t.commit();
@@ -72,10 +65,86 @@ export async function createOrcamento(req, res) {
       message: 'Orçamento e procedimentos criados com sucesso',
       orcamento
     });
+
   } catch (err) {
     await t.rollback();
     console.error(err);
     return res.status(500).json({ error: 'Falha ao criar orçamento e gerar PDF' });
+  }
+}
+
+export async function getPdfOrcamento(req, res) {
+  try {
+    const id = req.params.id;
+    const orcamento = await Orcamento.findByPk(id, {
+      attributes: ['arquivo_pdf']
+    });
+
+    if (!orcamento || !orcamento.arquivo_pdf) {
+      return res.status(404).json({ error: 'PDF não encontrado' });
+    }
+    const url = await getPdfUrl(orcamento.arquivo_pdf, 300);
+
+    return res.json({ url });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro ao gerar link do PDF' });
+  }
+}
+
+export async function uploadFoto(req, res) {
+  try {
+    const { idProcedimento, tipo } = req.params;
+    if (!['antes', 'depois'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo deve ser "antes" ou "depois"' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo não enviado' });
+    }
+
+    const extension = req.file.mimetype.split('/')[1];
+    const key = `procedimentos/${idProcedimento}/${tipo}_${Date.now()}.${extension}`;
+
+    await uploadBuffer(req.file.buffer, key, req.file.mimetype);
+
+    const campo = tipo === 'antes' ? 'foto_antes' : 'foto_depois';
+    const [rowsUpdated] = await OrcamentoProcedimento.update(
+      { [campo]: key },
+      { where: { id: idProcedimento } }
+    );
+
+    if (rowsUpdated === 0) {
+      return res.status(404).json({ error: 'Procedimento não encontrado' });
+    }
+
+    const url = await getUrl(key, 3600);
+
+    return res.json({ message: 'Upload realizado', key, url });
+  } catch (err) {
+    console.error('uploadFoto error:', err);
+    return res.status(500).json({
+      error: err.message || 'Falha no upload',
+      stack: err.stack
+    });
+  }
+}
+
+export async function getFotoUrl(req, res) {
+  try {
+    const { idProcedimento, tipo } = req.params;
+    if (!['antes', 'depois'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido' });
+    }
+    const campo = tipo === 'antes' ? 'foto_antes' : 'foto_depois';
+    const proc = await OrcamentoProcedimento.findByPk(idProcedimento);
+    if (!proc || !proc[campo]) {
+      return res.status(404).json({ error: 'Foto não encontrada' });
+    }
+    const url = await getUrl(proc[campo], 3600);
+    return res.json({ url });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro ao gerar URL' });
   }
 }
 
@@ -86,13 +155,11 @@ export async function getOrcamentos(req, res) {
     : null;
   const nomeFiltro = req.query.nome?.trim()?.toLowerCase();
 
-  // Filtro padrão de orçamentos
   const orcamentoWhere = {};
   if (usuarioId) {
     orcamentoWhere.usuario_id = usuarioId;
   }
 
-  // Se houver filtro de nome, montamos a cláusula
   const includeUsuario = {
     model: Usuario,
     as: 'usuario',
@@ -125,7 +192,6 @@ export async function getOrcamentos(req, res) {
       ...(limit != null ? { limit } : {})
     });
 
-    // garantir que retornamos sempre um array
     return res.json(Array.isArray(orcamentos) ? orcamentos : []);
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
@@ -183,12 +249,9 @@ export async function getProximosProcedimentos(req, res) {
   }
 }
 
-
 export async function getProcedimentos(req, res) {
-  const { status, dt_realizacao } = req.query;
-  const usuarioId = req.query.usuario_id
-    ? parseInt(req.query.usuario_id, 10)
-    : null;
+  const { nome, status, dt_realizacao, usuario_id } = req.query;
+  const usuarioId = usuario_id ? parseInt(usuario_id, 10) : null;
 
   const include = [
     {
@@ -196,42 +259,48 @@ export async function getProcedimentos(req, res) {
       as: 'orcamento',
       ...(usuarioId
         ? { where: { usuario_id: usuarioId }, required: true }
-        : { required: false }),
+        : { required: false }
+      ),
       include: [
         {
           model: Usuario,
           as: 'usuario',
-          attributes: ['id', 'nome']
+          attributes: ['id', 'nome'],
         }
       ]
     }
   ];
 
   const where = {};
+
   if (status) {
     where.status_retorno = { [Op.like]: `%${status}%` };
   }
+
   if (dt_realizacao) {
     const onlyDate = dt_realizacao.slice(0, 10);
     where.dt_realizacao = { [Op.eq]: onlyDate };
+  }
+
+  if (nome) {
+    where['$orcamento.usuario.nome$'] = { [Op.like]: `%${nome}%` };
   }
 
   try {
     const procedimentos = await OrcamentoProcedimento.findAll({
       include,
       where,
-      order: [['dt_realizacao', 'DESC']]
+      order: [['dt_realizacao', 'DESC']],
     });
     return res.json(procedimentos);
   } catch (error) {
     console.error('Erro ao buscar procedimentos:', error);
     return res.status(500).json({
       error: 'Erro ao buscar procedimentos',
-      message: error.message
+      message: error.message,
     });
   }
 }
-
 
 export async function getProcedimentoById(req, res) {
   const { idProcedimento } = req.params;
@@ -270,8 +339,6 @@ export async function getProcedimentoById(req, res) {
   }
 }
 
-
-
 export async function getUserById(req, res) {
   const { id } = req.params;
 
@@ -290,16 +357,6 @@ export async function getUserById(req, res) {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Erro interno' });
-  }
-}
-
-async function getTipoUsuarios(req, res) {
-  const tipoUsuarios = await TipoUsuario.findAll()
-
-  if (tipoUsuarios) {
-    res.json(tipoUsuarios)
-  } else {
-    res.status(500).json({ error: 'Erro ao buscar tipoUsuarios' })
   }
 }
 
@@ -340,22 +397,6 @@ async function updateProcedimento(req, res) {
   });
 }
 
-async function deleteUser(req, res) {
-  const { id } = req.params
-
-  const usuario = await Usuario.findByPk(id)
-
-  if (!usuario) {
-    return res.status(404).json({ error: 'Usuário não encontrado' })
-  }
-
-  try {
-    await usuario.destroy()
-    res.json({ message: 'Usuário excluído com sucesso' })
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao excluir usuário: ' + error.message })
-  }
-}
 
 export default {
   createOrcamento,
@@ -363,5 +404,8 @@ export default {
   getProximosProcedimentos,
   getProcedimentos,
   getProcedimentoById,
-  updateProcedimento
+  updateProcedimento,
+  getPdfOrcamento,
+  uploadFoto,
+  getFotoUrl
 }

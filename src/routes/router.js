@@ -6,6 +6,8 @@ import bcrypt from 'bcryptjs';
 import Usuario from '../models/Usuario.js';
 import transporter from '../services/email.js';
 
+
+import {uploadMemory} from '../services/multer.js'
 import { authenticate } from '../services/authService.js'
 import usuariosController from '../controllers/usuariosController.js'
 import orcamentoController from '../controllers/orcamentoController.js';
@@ -25,6 +27,9 @@ router.get('/proximos-procedimentos', orcamentoController.getProximosProcediment
 router.get('/procedimentos', orcamentoController.getProcedimentos)
 router.get('/procedimento/:idProcedimento', orcamentoController.getProcedimentoById)
 router.put('/procedimento/:idProcedimento', orcamentoController.updateProcedimento)
+router.get('/orcamento/:id/pdf', orcamentoController.getPdfOrcamento)
+router.post('/procedimento/:idProcedimento/upload/:tipo', uploadMemory.single('file'), orcamentoController.uploadFoto)
+router.get('/procedimento/:idProcedimento/url/:tipo', orcamentoController.getFotoUrl);
 
 router.post('/login', loginController.login)
 router.get('/eu', pegarUsuarioDoToken)
@@ -106,7 +111,6 @@ router.post('/forgot-password', async (req, res) => {
 router.post('/reset-password/:token', async (req, res) => {
   const { token } = req.params;
   const { senha } = req.body;
-  console.log(senha)
   try {
 
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
@@ -119,7 +123,6 @@ router.post('/reset-password/:token', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, 10);
 
     usuario.senha = senhaHash;
-    console.log(usuario.senha)
     await usuario.save();
 
     res.status(200).json({ message: 'Senha redefinida com sucesso.' });
