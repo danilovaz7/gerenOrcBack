@@ -17,13 +17,13 @@ Thumbs.db
 .env
 .env.*
 
-# Cache de ferramentas
-.cache/
-.next/
-dist/
-build/
-.vscode/
-.idea/
+# Cache de ferramentas e builds
+/.cache/
+/.next/
+/dist/
+/build/
+/.vscode/
+/.idea/
 
 # Arquivos temporários
 tmp/
