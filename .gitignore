@@ -18,7 +18,7 @@ Thumbs.db
 .env.*
 
 # Cache de ferramentas e builds
-/.cache/
+/.cache/ 
 /.next/
 /dist/
 /build/
