@@ -456,6 +456,24 @@ async function updateProcedimento(req, res) {
   });
 }
 
+async function deleteOrcamento(req, res) {
+  const { idOrcamento } = req.params
+
+  const orcamento = await Orcamento.findByPk(idOrcamento)
+
+  if (!orcamento) {
+    return res.status(404).json({ error: 'orcamento não encontrado' })
+  }
+
+  try {
+    await orcamento.destroy()
+    res.json({ message: 'orcamento excluído com sucesso' })
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir orcamento: ' + error.message })
+  }
+}
+
+
 
 export default {
   createOrcamento,
@@ -465,6 +483,7 @@ export default {
   getProcedimentos,
   getProcedimentoById,
   updateProcedimento,
+  deleteOrcamento,
   updateOrcamento,
   getPdfOrcamento,
   uploadFoto,
