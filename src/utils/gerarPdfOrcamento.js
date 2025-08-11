@@ -34,7 +34,7 @@ export async function gerarPdfOrcamento(
   orcamento,
   procedimentos,
   nomeUsuario,
-  dataCriacao
+  dataCriacao,
 ) {
   const templateDataUrl = carregarTemplateDataUrl()
 
@@ -60,7 +60,8 @@ export async function gerarPdfOrcamento(
       {
         text: `Nome do paciente: ${nomeUsuario}`, margin: [0, 0, 0, 5]
       },
-      { text: `Data de Criação: ${formatarDataBrasileira(dataCriacao)}`, margin: [0, 0, 0, 10] },
+      { text: `Data de Criação: ${formatarDataBrasileira(dataCriacao)}`, margin: [0, 0, 0, 5] },
+      { text: `Data de Validade: ${formatarDataBrasileira(orcamento.validade)}`, margin: [0, 0, 0, 10] },
 
       { text: 'Procedimentos', style: 'subheader' },
       {
@@ -86,9 +87,15 @@ export async function gerarPdfOrcamento(
       { text: `Forma de Pagamento: ${formaPagCap}`, margin: [0, 20, 0, 5], alignment: 'right' },
       {
         text: `Valor Total: R$ ${parseFloat(orcamento.valor_total).toFixed(2)}`,
+        margin: [0, 5, 0, 5],
+        alignment: 'right'
+      },
+       {
+        text: `Valor Parcelado: R$ ${orcamento.valor_parcelado}`,
         margin: [0, 5, 0, 10],
         alignment: 'right'
       }
+      
     ],
     styles: {
       header: { fontSize: 20, bold: true, margin: [0, 0, 0, 10] },

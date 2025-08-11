@@ -230,7 +230,10 @@ module.exports = {
         onDelete: 'CASCADE'
       },
       forma_pagamento: { type: Sequelize.STRING, allowNull: false },
+      validade: { type: Sequelize.DATE, allowNull: false },
+      status: { type: Sequelize.ENUM('Aguardando pagamento', 'Pago'), allowNull: false, defaultValue: 'Aguardando pagamento' },
       valor_total: { type: Sequelize.DECIMAL(10, 2), allowNull: false },
+      valor_parcelado: { type: Sequelize.STRING, allowNull: true },
       arquivo_pdf: { type: Sequelize.STRING, allowNull: true },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
@@ -266,7 +269,7 @@ module.exports = {
       valor_procedimento: { type: Sequelize.DECIMAL(10, 2), allowNull: false },
       foto_antes: { type: Sequelize.STRING, allowNull: true },
       foto_depois: { type: Sequelize.STRING, allowNull: true },
-      status_retorno: { type: Sequelize.ENUM('finalizado', 'aguardando procedimento', 'retorno'), allowNull: false, defaultValue: 'aguardando procedimento' },
+      status_retorno: { type: Sequelize.ENUM('Finalizado', 'Aguardando procedimento', 'Retorno'), allowNull: false, defaultValue: 'Aguardando procedimento' },
       num_retorno: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       dt_realizacao: { type: Sequelize.DATEONLY, allowNull: true },
       dt_ultimo_retorno: { type: Sequelize.DATEONLY, allowNull: true },

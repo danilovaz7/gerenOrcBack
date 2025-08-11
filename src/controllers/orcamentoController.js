@@ -13,13 +13,15 @@ import { getUrl } from '../services/s3.js';
 
 export async function createOrcamento(req, res) {
   const sequelize = Orcamento.sequelize;
-  const { usuario_id, forma_pagamento, valor_total, procedimentos = [] } = req.body;
+  const { usuario_id, forma_pagamento, validade, valor_total,valor_parcelado, procedimentos = [] } = req.body;
 
   const t = await sequelize.transaction();
   try {
     const orcamento = await Orcamento.create({
       usuario_id,
       forma_pagamento,
+      validade,
+      valor_parcelado,
       valor_total,
       arquivo_pdf: null
     }, { transaction: t });
@@ -48,7 +50,7 @@ export async function createOrcamento(req, res) {
       : null;
 
     const bufferPDF = await gerarPdfOrcamento(
-      { forma_pagamento, valor_total, logo: logoDataUrl },
+      { forma_pagamento, validade, valor_parcelado, valor_total, logo: logoDataUrl },
       procedimentos,
       nomeUsuario,
       orcamento.createdAt
@@ -198,6 +200,29 @@ export async function getOrcamentos(req, res) {
     return res
       .status(500)
       .json({ error: 'Erro ao buscar orçamentos', message: error.message });
+  }
+}
+
+export async function getOrcamentoById(req, res) {
+  const { idOrcamento } = req.params;
+
+  try {
+    const orcamento = await Orcamento.findOne({
+      where: { id: idOrcamento },
+
+    });
+
+    if (!orcamento) {
+      return res.status(404).json({ error: 'orcamento não encontrado' });
+    }
+
+    return res.json(orcamento);
+  } catch (error) {
+    console.error('Erro ao buscar orcamento:', error);
+    return res.status(500).json({
+      error: 'Erro ao buscar orcamento',
+      message: error.message
+    });
   }
 }
 
@@ -360,6 +385,40 @@ export async function getUserById(req, res) {
   }
 }
 
+
+async function updateOrcamento(req, res) {
+  const { idOrcamento } = req.params
+  const { status } = req.body;
+  console.log(status)
+
+  const orcamento = await Orcamento.findByPk(idOrcamento)
+
+  if (!orcamento) {
+    return res.status(404).json({ error: 'orcamento não encontrado' })
+  }
+
+  if (status) orcamento.status = status
+
+  try {
+    await orcamento.validate();
+  } catch (err) {
+    return res.status(400).json({ error: 'orcamento inválida: ' + err.message });
+  }
+
+  try {
+    await orcamento.save();
+  } catch (err) {
+    console.error('Erro ao salvar orcamento:', err);
+    return res
+      .status(500)
+      .json({ error: 'Erro ao salvar orcamento: ' + err.message });
+  }
+
+  return res.json({
+    orcamento: orcamento.toJSON(),
+  });
+}
+
 async function updateProcedimento(req, res) {
   const { idProcedimento } = req.params
   const { status_retorno, dt_realizacao, num_retorno, obs_procedimento } = req.body;
@@ -401,10 +460,12 @@ async function updateProcedimento(req, res) {
 export default {
   createOrcamento,
   getOrcamentos,
+  getOrcamentoById,
   getProximosProcedimentos,
   getProcedimentos,
   getProcedimentoById,
   updateProcedimento,
+  updateOrcamento,
   getPdfOrcamento,
   uploadFoto,
   getFotoUrl

@@ -47,9 +47,9 @@ const OrcamentoProcedimento = database.define('orcamento_procedimentos', {
     allowNull: true,
   },
   status_retorno: {
-    type: DataTypes.ENUM('finalizado', 'aguardando procedimento', 'retorno'),
+    type: DataTypes.ENUM('Finalizado', 'Aguardando procedimento', 'Retorno'),
     allowNull: false,
-    defaultValue: 'aguardando procedimento',
+    defaultValue: 'Aguardando procedimento',
   },
   num_retorno: {
     type: DataTypes.INTEGER,

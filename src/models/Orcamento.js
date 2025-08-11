@@ -21,6 +21,19 @@ const Orcamento = database.define('Orcamento', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  validade: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+  valor_parcelado: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  status: {
+    type: DataTypes.ENUM('Aguardando pagamento', 'Pago'),
+    allowNull: false,
+    defaultValue: 'Aguardando pagamento',
+  },
   valor_total: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,

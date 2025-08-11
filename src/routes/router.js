@@ -23,6 +23,8 @@ router.delete('/usuarios/:id', authenticate, usuariosController.deleteUser)
 
 router.post('/orcamentos', orcamentoController.createOrcamento)
 router.get('/orcamentos', orcamentoController.getOrcamentos)
+router.get('/orcamentos/:idOrcamento', orcamentoController.getOrcamentoById)
+router.put('/orcamentos/:idOrcamento', orcamentoController.updateOrcamento)
 router.get('/proximos-procedimentos', orcamentoController.getProximosProcedimentos)
 router.get('/procedimentos', orcamentoController.getProcedimentos)
 router.get('/procedimento/:idProcedimento', orcamentoController.getProcedimentoById)
