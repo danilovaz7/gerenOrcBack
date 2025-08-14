@@ -10,6 +10,17 @@ dotenv.config();
 console.log('process.env.FRONTEND_URL', process.env.FRONTEND_URL)
 const app = express();
 
+import { STSClient, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
+
+const sts = new STSClient({ region: process.env.AWS_REGION, credentials: {
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+}});
+
+const id = await sts.send(new GetCallerIdentityCommand({}));
+console.log('caller identity:', id); // procure o ARN (user/role)
+
+
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'https://scso0gcwswksoow80k004g8w.69.62.99.208.sslip.io',
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
