@@ -88,7 +88,7 @@ router.post('/forgot-password', async (req, res) => {
     const token = jwt.sign({ userId: usuario.id }, process.env.SECRET_KEY, { expiresIn: '1h' });
 
 
-    const resetLink = `http://${process.env.FRONTEND_URL}:5173/redefinir-senha/${token}`;
+    const resetLink = `${process.env.FRONTEND_URL}/redefinir-senha/${token}`;
     const mailOptions = {
       from: 'admclinicaleutz@gmail.com@gmail.com',
       to: usuario.email,
