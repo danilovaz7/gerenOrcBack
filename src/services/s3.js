@@ -26,7 +26,6 @@ export async function uploadBuffer(buffer, key, contentType, publicRead = false)
         Key: key,
         Body: buffer,
         ContentType: contentType,
-
     });
     await s3.send(cmd);
 }

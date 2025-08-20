@@ -8,7 +8,7 @@ module.exports = {
     const usuarios = [
       {
         nome: 'Camila Leutz',
-        email: 'Camillaleutz@outlook.com',
+        email: 'clinicaleutz@outlook.com',
         senha: '123',
         cpf: '396.179.728-59',
         rg: '135263636',

@@ -27,14 +27,28 @@ export async function createUser(req, res) {
   } = req.body;
 
   try {
+    // --- parsing seguro ---
+    const idTipoParsed = id_tipo_usuario == null ? null : Number(id_tipo_usuario);
+    if (idTipoParsed == null || Number.isNaN(idTipoParsed) || !Number.isInteger(idTipoParsed)) {
+      return res.status(400).json({ error: 'id_tipo_usuario inválido ou ausente' });
+    }
+
+    // Preserve 0 (não tratar 0 como "falsy")
+    const filhosParsed = (filhos === '' || filhos == null) ? null : Number(filhos);
+    if (filhosParsed != null && Number.isNaN(filhosParsed)) {
+      return res.status(400).json({ error: 'filhos inválido' });
+    }
+
+    // dt_nascimento: aceita null ou formato YYYY-MM-DD
+    const dtNascParsed = (dt_nascimento && /^\d{4}-\d{2}-\d{2}$/.test(dt_nascimento))
+      ? dt_nascimento
+      : null;
 
     const payload = {
       nome,
-      id_tipo_usuario: parseInt(id_tipo_usuario, 10),
-      filhos: filhos ? parseInt(filhos, 10) : null,
-      dt_nascimento: dt_nascimento && /^\d{4}-\d{2}-\d{2}$/.test(dt_nascimento)
-        ? dt_nascimento
-        : null,
+      id_tipo_usuario: idTipoParsed,
+      filhos: filhosParsed,
+      dt_nascimento: dtNascParsed,
       rg,
       cpf,
       estado_civil,
@@ -65,42 +79,52 @@ export async function createUser(req, res) {
       senha: senhaHash,
       ic_ativo: true
     });
+
+    // validação do sequelize (vai lançar SequelizeValidationError)
     await usuario.validate();
     await usuario.save();
 
+    // cria tabelas relacionadas (se necessário)
+    await UsuarioAnamnese.create({ usuario_id: usuario.id, pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE', anemia: 'NÃO SABE', hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
+    await UsuarioExameComplementar.create({ usuario_id: usuario.id });
+
+    // Responda para o cliente (201) ANTES de mandar o e-mail para não bloquear em caso de erro no envio
+    const userData = usuario.toJSON();
+    res.status(201).json({
+      ...userData,
+      senha: senhaRandom
+    });
+
+    // Enviar e-mail sem bloquear (fire-and-forget) — loga erros apenas
     const mailOptions = {
       from: 'equipeplay2learn@gmail.com',
       to: usuario.email,
       subject: 'Seja bem-vindo(a)',
       html: `
-      <h2>Parabéns!</h2>
-      <p>Você foi cadastrado no sistema da <strong>Clínica Leutz</strong></p>
-       <p>É um prazer poder atender você!</strong></p>
-      <p>
-        <strong>E-mail:</strong> <strong>${usuario.email}</strong><br>
-        <strong>Senha:</strong> <strong>${senhaRandom}</strong>
-      </p>
-    `
+        <h2>Parabéns!</h2>
+        <p>Você foi cadastrado no sistema da <strong>Clínica Leutz</strong></p>
+        <p><strong>E-mail:</strong> <strong>${usuario.email}</strong><br>
+        <strong>Senha:</strong> <strong>${senhaRandom}</strong></p>
+      `
     };
-    await transporter.sendMail(mailOptions);
 
-    await UsuarioAnamnese.create({ usuario_id: usuario.id, pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE', anemia: 'NÃO SABE', hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
-    await UsuarioExameComplementar.create({ usuario_id: usuario.id });
-
-    const userData = usuario.toJSON();
-    return res.status(201).json({
-      ...userData,
-      senha: senhaRandom
-    });
+    transporter.sendMail(mailOptions)
+      .then(info => console.log('Email enviado para usuário:', usuario.email, info?.response || info))
+      .catch(err => console.error('Erro ao enviar email (não bloqueia criação):', err));
 
   } catch (error) {
-    if (error.name === 'SequelizeValidationError') {
+    // Tratamentos específicos para Sequelize
+    if (error instanceof Sequelize.UniqueConstraintError || error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ error: 'Já existe um usuário com esse email/CPF.' });
+    }
+    if (error instanceof Sequelize.ValidationError || error.name === 'SequelizeValidationError') {
       return res
         .status(400)
         .json({ error: 'Dados inválidos: ' + error.errors.map(e => e.message).join('; ') });
     }
-    console.error(error);
-    return res.status(500).json({ error: 'Erro interno: ' + error.message });
+
+    console.error('Erro interno createUser:', error);
+    return res.status(500).json({ error: 'Erro interno: ' + (error.message || 'unknown') });
   }
 }
 
