@@ -165,7 +165,7 @@ export async function getUsers(req, res) {
 
 export async function getAniversariantesDoMes(req, res) {
   try {
-    const month = new Date().getMonth() + 1; // 1..12
+    const month = new Date().getMonth() + 1;
 
     const aniversariantes = await Usuario.findAll({
       where: where(fn('MONTH', col('dt_nascimento')), month),
