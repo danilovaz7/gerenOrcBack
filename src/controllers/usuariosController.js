@@ -170,7 +170,7 @@ export async function getAniversariantesDoMes(req, res) {
 
     const aniversariantes = await Usuario.findAll({
       where: where(fn('MONTH', col('dt_nascimento')), month),
-      attributes: ['id', 'nome', 'dt_nascimento', 'email'],
+      attributes: ['id', 'nome', 'dt_nascimento', 'email', 'celular'],
       order: [['nome', 'ASC']]
     });
 
