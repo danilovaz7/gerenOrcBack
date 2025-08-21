@@ -20,6 +20,7 @@ router.get('/usuarios', usuariosController.getUsers)
 router.get('/usuarios/:id', authenticate, usuariosController.getUserById)
 router.put('/usuarios/:id', authenticate, usuariosController.updateUser)
 router.delete('/usuarios/:id', authenticate, usuariosController.deleteUser)
+router.get('/usuarios/aniversariantes', authenticate, usuariosController.getAniversariantesDoMes)
 
 router.post('/orcamentos', orcamentoController.createOrcamento)
 router.get('/orcamentos', orcamentoController.getOrcamentos)

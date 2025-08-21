@@ -27,19 +27,14 @@ export async function createUser(req, res) {
   } = req.body;
 
   try {
-    // --- parsing seguro ---
     const idTipoParsed = id_tipo_usuario == null ? null : Number(id_tipo_usuario);
     if (idTipoParsed == null || Number.isNaN(idTipoParsed) || !Number.isInteger(idTipoParsed)) {
       return res.status(400).json({ error: 'id_tipo_usuario inválido ou ausente' });
     }
-
-    // Preserve 0 (não tratar 0 como "falsy")
     const filhosParsed = (filhos === '' || filhos == null) ? null : Number(filhos);
     if (filhosParsed != null && Number.isNaN(filhosParsed)) {
       return res.status(400).json({ error: 'filhos inválido' });
     }
-
-    // dt_nascimento: aceita null ou formato YYYY-MM-DD
     const dtNascParsed = (dt_nascimento && /^\d{4}-\d{2}-\d{2}$/.test(dt_nascimento))
       ? dt_nascimento
       : null;
@@ -80,22 +75,18 @@ export async function createUser(req, res) {
       ic_ativo: true
     });
 
-    // validação do sequelize (vai lançar SequelizeValidationError)
     await usuario.validate();
     await usuario.save();
 
-    // cria tabelas relacionadas (se necessário)
     await UsuarioAnamnese.create({ usuario_id: usuario.id, pressao_tipo: 'Normal', diabetico: 'NÃO SABE', prob_cardiaco: 'NÃO SABE', anemia: 'NÃO SABE', hepa: 'NÃO SABE', outra_doenca: 'NÃO SABE' });
     await UsuarioExameComplementar.create({ usuario_id: usuario.id });
 
-    // Responda para o cliente (201) ANTES de mandar o e-mail para não bloquear em caso de erro no envio
     const userData = usuario.toJSON();
     res.status(201).json({
       ...userData,
       senha: senhaRandom
     });
 
-    // Enviar e-mail sem bloquear (fire-and-forget) — loga erros apenas
     const mailOptions = {
       from: 'equipeplay2learn@gmail.com',
       to: usuario.email,
@@ -113,7 +104,7 @@ export async function createUser(req, res) {
       .catch(err => console.error('Erro ao enviar email (não bloqueia criação):', err));
 
   } catch (error) {
-    // Tratamentos específicos para Sequelize
+  
     if (error instanceof Sequelize.UniqueConstraintError || error.name === 'SequelizeUniqueConstraintError') {
       return res.status(409).json({ error: 'Já existe um usuário com esse email/CPF.' });
     }
@@ -172,6 +163,22 @@ export async function getUsers(req, res) {
   }
 }
 
+export async function getAniversariantesDoMes(req, res) {
+  try {
+    const month = new Date().getMonth() + 1; // 1..12
+
+    const aniversariantes = await Usuario.findAll({
+      where: where(fn('MONTH', col('dt_nascimento')), month),
+      attributes: ['id', 'nome', 'dt_nascimento', 'email'],
+      order: [['nome', 'ASC']]
+    });
+
+    return res.json(aniversariantes.map(u => u.toJSON()));
+  } catch (err) {
+    console.error('Erro ao buscar aniversariantes:', err);
+    return res.status(500).json({ error: 'Erro ao buscar aniversariantes', message: err.message });
+  }
+}
 
 export async function getUserById(req, res) {
   const { id } = req.params;
@@ -325,5 +332,6 @@ export default {
   getUserById,
   updateUser,
   deleteUser,
-  getTipoUsuarios
+  getTipoUsuarios,
+  getAniversariantesDoMes
 }
