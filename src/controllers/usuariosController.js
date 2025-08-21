@@ -1,6 +1,7 @@
 import generator from "generate-password";
 import bcrypt from 'bcryptjs';
-import { Op, fn, col } from 'sequelize';
+import { Op, fn, col,where } from 'sequelize';
+
 import transporter from '../services/email.js';
 
 import Usuario from "../models/Usuario.js";
