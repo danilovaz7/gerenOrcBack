@@ -32,8 +32,9 @@ router.get('/procedimentos', orcamentoController.getProcedimentos)
 router.get('/procedimento/:idProcedimento', orcamentoController.getProcedimentoById)
 router.put('/procedimento/:idProcedimento', orcamentoController.updateProcedimento)
 router.get('/orcamento/:id/pdf', orcamentoController.getPdfOrcamento)
-router.post('/procedimento/:idProcedimento/upload/:tipo', uploadMemory.single('file'), orcamentoController.uploadFoto)
-router.get('/procedimento/:idProcedimento/url/:tipo', orcamentoController.getFotoUrl);
+router.post('/procedimento/:idProcedimento/upload',uploadMemory.array('files', 10), orcamentoController.uploadFotos);
+router.get('/procedimento/:idProcedimento/url', orcamentoController.getFotoUrls);
+
 
 router.post('/login', loginController.login)
 router.get('/eu', pegarUsuarioDoToken)

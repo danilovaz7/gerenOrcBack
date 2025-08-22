@@ -38,14 +38,6 @@ const OrcamentoProcedimento = database.define('orcamento_procedimentos', {
     },
     onDelete: 'CASCADE',
   },
-  foto_antes: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  foto_depois: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
   status_retorno: {
     type: DataTypes.ENUM('Finalizado', 'Aguardando procedimento', 'Retorno'),
     allowNull: false,

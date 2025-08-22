@@ -267,8 +267,6 @@ module.exports = {
       nome_procedimento: { type: Sequelize.STRING, allowNull: false },
       obs_procedimento: { type: Sequelize.STRING, allowNull: false },
       valor_procedimento: { type: Sequelize.DECIMAL(10, 2), allowNull: false },
-      foto_antes: { type: Sequelize.STRING, allowNull: true },
-      foto_depois: { type: Sequelize.STRING, allowNull: true },
       status_retorno: { type: Sequelize.ENUM('Finalizado', 'Aguardando procedimento', 'Retorno'), allowNull: false, defaultValue: 'Aguardando procedimento' },
       num_retorno: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       dt_realizacao: { type: Sequelize.DATEONLY, allowNull: true },
@@ -277,9 +275,30 @@ module.exports = {
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
+    await queryInterface.createTable('procedimento_fotos', {
+      id: { type: Sequelize.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true, },
+      procedimento_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'orcamento_procedimentos',
+          key: 'id',
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
+      },
+      s3_key: { type: Sequelize.STRING(1024), allowNull: false, },
+      descricao: { type: Sequelize.STRING(1024), allowNull: true, },
+      ordem: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0, },
+      ativo: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, },
+      createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'), },
+      updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), },
+    });
+
 
   },
   async down(queryInterface, Sequelize) {
+     await queryInterface.dropTable('procedimento_fotos');
     await queryInterface.dropTable('orcamento_procedimentos');
     await queryInterface.dropTable('usuario_exames_complementares');
     await queryInterface.dropTable('usuario_anamneses');

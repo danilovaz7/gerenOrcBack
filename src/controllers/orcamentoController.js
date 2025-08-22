@@ -4,6 +4,7 @@ import TipoUsuario from "../models/TipoUsuario.js";
 import { Op, fn, col, where } from 'sequelize';
 import { uploadBuffer } from '../services/s3.js';
 import { uploadPdf, getPdfUrl } from '../services/s3.js';
+import ProcedimentoFoto from '../models/ProcedimentoFoto.js';
 import Orcamento from '../models/Orcamento.js';
 import OrcamentoProcedimento from '../models/OrcamentoProcedimento.js';
 import fs from 'fs';
@@ -13,7 +14,7 @@ import { getUrl } from '../services/s3.js';
 
 export async function createOrcamento(req, res) {
   const sequelize = Orcamento.sequelize;
-  const { usuario_id, forma_pagamento, validade, valor_total,valor_parcelado, procedimentos = [] } = req.body;
+  const { usuario_id, forma_pagamento, validade, valor_total, valor_parcelado, procedimentos = [] } = req.body;
 
   const t = await sequelize.transaction();
   try {
@@ -32,8 +33,6 @@ export async function createOrcamento(req, res) {
       obs_procedimento: p.obs_procedimento,
       usuario_id,
       orcamento_id: orcamento.id,
-      foto_antes: p.foto_antes,
-      foto_depois: p.foto_depois,
       status_retorno: p.status_retorno,
       num_retorno: p.num_retorno,
       dt_realizacao: p.dt_realizacao,
@@ -94,36 +93,49 @@ export async function getPdfOrcamento(req, res) {
   }
 }
 
-export async function uploadFoto(req, res) {
+export async function uploadFotos(req, res) {
   try {
-    const { idProcedimento, tipo } = req.params;
-    if (!['antes', 'depois'].includes(tipo)) {
-      return res.status(400).json({ error: 'Tipo deve ser "antes" ou "depois"' });
-    }
-    if (!req.file) {
-      return res.status(400).json({ error: 'Arquivo não enviado' });
+    const { idProcedimento } = req.params;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    const extension = req.file.mimetype.split('/')[1];
-    const key = `procedimentos/${idProcedimento}/${tipo}_${Date.now()}.${extension}`;
+    // Pega a maior ordem atual
+    const lastFoto = await ProcedimentoFoto.findOne({
+      where: { procedimento_id: idProcedimento },
+      order: [['ordem', 'DESC']],
+    });
+    let ordemAtual = lastFoto ? lastFoto.ordem + 1 : 1;
 
-    await uploadBuffer(req.file.buffer, key, req.file.mimetype);
+    const fotosCriadas = [];
+    for (const file of req.files) {
+      const extension = file.mimetype.split('/')[1] || 'jpg';
+      const key = `procedimentos/${idProcedimento}/${Date.now()}_${Math.random().toString(36).substring(2)}.${extension}`;
 
-    const campo = tipo === 'antes' ? 'foto_antes' : 'foto_depois';
-    const [rowsUpdated] = await OrcamentoProcedimento.update(
-      { [campo]: key },
-      { where: { id: idProcedimento } }
-    );
+      // Upload para S3
+      await uploadBuffer(file.buffer, key, file.mimetype);
 
-    if (rowsUpdated === 0) {
-      return res.status(404).json({ error: 'Procedimento não encontrado' });
+      // Salva no banco
+      const foto = await ProcedimentoFoto.create({
+        procedimento_id: idProcedimento,
+        s3_key: key,
+        ordem: ordemAtual++,
+        ativo: true,
+      });
+
+      const url = await getUrl(key, 3600);
+      fotosCriadas.push({
+        id: foto.id,
+        key,
+        url,
+        ordem: foto.ordem
+      });
     }
 
-    const url = await getUrl(key, 3600);
-
-    return res.json({ message: 'Upload realizado', key, url });
+    return res.json({ message: 'Upload realizado', fotos: fotosCriadas });
   } catch (err) {
-    console.error('uploadFoto error:', err);
+    console.error('uploadFotos error:', err);
     return res.status(500).json({
       error: err.message || 'Falha no upload',
       stack: err.stack
@@ -131,22 +143,33 @@ export async function uploadFoto(req, res) {
   }
 }
 
-export async function getFotoUrl(req, res) {
+export async function getFotoUrls(req, res) {
   try {
-    const { idProcedimento, tipo } = req.params;
-    if (!['antes', 'depois'].includes(tipo)) {
-      return res.status(400).json({ error: 'Tipo inválido' });
+    const { idProcedimento } = req.params;
+
+    const fotos = await ProcedimentoFoto.findAll({
+      where: { procedimento_id: idProcedimento, ativo: true },
+      order: [['ordem', 'ASC']],
+    });
+
+    if (!fotos.length) {
+      return res.status(404).json({ error: 'Nenhuma foto encontrada' });
     }
-    const campo = tipo === 'antes' ? 'foto_antes' : 'foto_depois';
-    const proc = await OrcamentoProcedimento.findByPk(idProcedimento);
-    if (!proc || !proc[campo]) {
-      return res.status(404).json({ error: 'Foto não encontrada' });
-    }
-    const url = await getUrl(proc[campo], 3600);
-    return res.json({ url });
+
+    // Gera URL assinada para cada foto
+    const fotosComUrls = await Promise.all(
+      fotos.map(async f => ({
+        id: f.id,
+        key: f.s3_key,
+        ordem: f.ordem,
+        url: await getUrl(f.s3_key, 3600),
+      }))
+    );
+
+    return res.json({ fotos: fotosComUrls });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Erro ao gerar URL' });
+    return res.status(500).json({ error: 'Erro ao gerar URLs' });
   }
 }
 
@@ -486,6 +509,6 @@ export default {
   deleteOrcamento,
   updateOrcamento,
   getPdfOrcamento,
-  uploadFoto,
-  getFotoUrl
+  uploadFotos,
+  getFotoUrls
 }
