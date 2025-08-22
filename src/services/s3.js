@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl as presigner } from "@aws-sdk/s3-request-presigner";
 
 // Configuração do AWS S3
@@ -61,4 +61,9 @@ export async function getUrl(key, expiresIn = 300) {
  */
 export async function getPdfUrl(key, expiresIn = 300) {
     return getUrl(key, expiresIn);
+}
+
+export async function deleteKey(key) {
+  const cmd = new DeleteObjectCommand({ Bucket: BUCKET, Key: key });
+  return s3.send(cmd);
 }

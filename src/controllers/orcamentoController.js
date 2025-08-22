@@ -113,10 +113,8 @@ export async function uploadFotos(req, res) {
       const extension = file.mimetype.split('/')[1] || 'jpg';
       const key = `procedimentos/${idProcedimento}/${Date.now()}_${Math.random().toString(36).substring(2)}.${extension}`;
 
-      // Upload para S3
       await uploadBuffer(file.buffer, key, file.mimetype);
 
-      // Salva no banco
       const foto = await ProcedimentoFoto.create({
         procedimento_id: idProcedimento,
         s3_key: key,
@@ -156,7 +154,6 @@ export async function getFotoUrls(req, res) {
       return res.status(404).json({ error: 'Nenhuma foto encontrada' });
     }
 
-    // Gera URL assinada para cada foto
     const fotosComUrls = await Promise.all(
       fotos.map(async f => ({
         id: f.id,
@@ -170,6 +167,97 @@ export async function getFotoUrls(req, res) {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Erro ao gerar URLs' });
+  }
+}
+
+
+export async function deleteFoto(req, res) {
+  try {
+    const {  fotoId } = req.params;
+
+    const foto = await ProcedimentoFoto.findOne({
+      where: { id: fotoId}
+    });
+
+    if (!foto) return res.status(404).json({ error: 'Foto não encontrada' });
+
+    const key = foto.s3_key;
+
+    try {
+      await deleteKey(key);
+    } catch (s3err) {
+  
+      console.error('Erro ao deletar do S3:', s3err);
+    }
+   foto.destroy()
+    await foto.save();
+
+  
+    return res.json({ ok: true, fotoId: foto.id });
+  } catch (err) {
+    console.error('deleteFoto error:', err);
+    return res.status(500).json({ error: err.message || 'Erro ao excluir foto' });
+  }
+}
+
+export async function replaceFoto(req, res) {
+  try {
+    const { procId, fotoId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo não enviado' });
+    }
+
+    // validação básica
+    if (!req.file.mimetype?.startsWith('image/')) {
+      return res.status(400).json({ error: 'Apenas imagens são permitidas' });
+    }
+
+    // busca registro existente
+    const foto = await ProcedimentoFoto.findOne({
+      where: { id: fotoId, procedimento_id: procId },
+    });
+    if (!foto) return res.status(404).json({ error: 'Foto não encontrada' });
+
+    const oldKey = foto.s3_key;
+
+    // gerar nova key
+    const ext = (req.file.originalname?.split('.').pop() || req.file.mimetype.split('/')[1] || 'jpg');
+    const newKey = `procedimentos/${procId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+    // 1) upload novo arquivo para S3
+    await uploadBuffer(req.file.buffer, newKey, req.file.mimetype);
+
+    // 2) atualiza DB dentro de transação para consistência (remove vazamento se falhar)
+    const sequelize = ProcedimentoFoto.sequelize; // assume model ligado ao db
+    const t = await sequelize.transaction();
+    try {
+      foto.s3_key = newKey;
+      await foto.save({ transaction: t });
+      await t.commit();
+    } catch (dbErr) {
+      await t.rollback();
+      // remove novo arquivo do S3 para não vazar
+      try { await deleteKey(newKey); } catch (e) { console.error('Erro deletando novoKey após rollback:', e); }
+      throw dbErr;
+    }
+
+    // 3) tenta deletar o antigo (se falhar, apenas logamos)
+    try {
+      if (oldKey) await deleteKey(oldKey);
+    } catch (delErr) {
+      console.error('Erro ao deletar key antiga do S3:', delErr);
+    }
+
+    // 4) retorna info atualizada com URL assinada
+    const url = await getUrl(newKey, 3600);
+    return res.json({
+      ok: true,
+      foto: { id: foto.id, key: newKey, url, ordem: foto.ordem }
+    });
+  } catch (err) {
+    console.error('replaceFoto error:', err);
+    return res.status(500).json({ error: err.message || 'Erro ao substituir foto' });
   }
 }
 
@@ -510,5 +598,7 @@ export default {
   updateOrcamento,
   getPdfOrcamento,
   uploadFotos,
-  getFotoUrls
+  getFotoUrls,
+  deleteFoto,
+  replaceFoto
 }
