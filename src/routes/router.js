@@ -35,7 +35,7 @@ router.get('/orcamento/:id/pdf', orcamentoController.getPdfOrcamento)
 router.post('/procedimento/:idProcedimento/upload',uploadMemory.array('files', 10), orcamentoController.uploadFotos);
 router.get('/procedimento/:idProcedimento/url', orcamentoController.getFotoUrls);
 router.delete('/procedimento/foto/:fotoId',  orcamentoController.deleteFoto);
-router.put('/procedimento/:procId/foto/:fotoId/replace',uploadMemory.single('file'), replaceFoto);
+router.put('/procedimento/:procId/foto/:fotoId/replace',uploadMemory.single('file'), orcamentoController.replaceFoto);
 
 
 router.post('/login', loginController.login)
