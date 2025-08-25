@@ -295,10 +295,30 @@ module.exports = {
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), },
     });
 
+    await queryInterface.createTable('versionamento_retornos', {
+      id: { type: Sequelize.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true, },
+      procedimento_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'orcamento_procedimentos',
+          key: 'id',
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
+      },
+      num_retorno: { type: Sequelize.INTEGER, allowNull: true },
+      descricao: { type: Sequelize.STRING(1024), allowNull: true, },
+      dt_retorno: { type: Sequelize.DATEONLY, allowNull: true, },
+      createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'), },
+      updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), },
+    });
+
 
   },
   async down(queryInterface, Sequelize) {
-     await queryInterface.dropTable('procedimento_fotos');
+    await queryInterface.dropTable('procedimento_fotos');
+    await queryInterface.dropTable('versionamento_retornos');
     await queryInterface.dropTable('orcamento_procedimentos');
     await queryInterface.dropTable('usuario_exames_complementares');
     await queryInterface.dropTable('usuario_anamneses');

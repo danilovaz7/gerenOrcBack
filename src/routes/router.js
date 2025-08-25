@@ -36,7 +36,8 @@ router.post('/procedimento/:idProcedimento/upload',uploadMemory.array('files', 1
 router.get('/procedimento/:idProcedimento/url', orcamentoController.getFotoUrls);
 router.delete('/procedimento/foto/:fotoId',  orcamentoController.deleteFoto);
 router.put('/procedimento/:procId/foto/:fotoId/replace',uploadMemory.single('file'), orcamentoController.replaceFoto);
-
+router.post('/procedimento/:idProcedimento/retornos', orcamentoController.createVersaoRetorno)
+router.get('/procedimento/:idProcedimento/retornos', orcamentoController.getVersaoRetornoByProcedimento)
 
 router.post('/login', loginController.login)
 router.get('/eu', pegarUsuarioDoToken)

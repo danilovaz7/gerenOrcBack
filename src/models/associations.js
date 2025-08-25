@@ -4,7 +4,8 @@ import UsuarioAnamnese from './UsuarioAnamnese.js';
 import UsuarioExameComplementar from './UsuarioExameComplementar.js';
 import Orcamento from './Orcamento.js';
 import OrcamentoProcedimento from './OrcamentoProcedimento.js';
-import ProcedimentoFoto from './ProcedimentoFoto.js'; // <-- import adicionado
+import ProcedimentoFoto from './ProcedimentoFoto.js'; 
+import VersionamentoRetorno from './VersionamentoRetorno.js';
 
 TipoUsuario.hasMany(Usuario, { foreignKey: 'id_tipo_usuario', as: 'usuarios' });
 Usuario.belongsTo(TipoUsuario, { foreignKey: 'id_tipo_usuario', as: 'tipo_usuario' });
@@ -48,5 +49,14 @@ OrcamentoProcedimento.hasMany(ProcedimentoFoto, {
 });
 ProcedimentoFoto.belongsTo(OrcamentoProcedimento, {
   foreignKey: 'procedimento_id',
-  as: 'procedimento'
+  as: 'procedimentoRetornos'
+});
+
+OrcamentoProcedimento.hasMany(VersionamentoRetorno, {
+  foreignKey: 'procedimento_id',
+  as: 'versoes'
+});
+VersionamentoRetorno.belongsTo(OrcamentoProcedimento, {
+  foreignKey: 'procedimento_id',
+  as: 'procedimentoRetornos'
 });

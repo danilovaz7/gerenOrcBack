@@ -1,6 +1,6 @@
 
 import Usuario from "../models/Usuario.js";
-import TipoUsuario from "../models/TipoUsuario.js";
+import VersionamentoRetorno from "../models/VersionamentoRetorno.js";
 import { Op, fn, col, where } from 'sequelize';
 import { uploadBuffer } from '../services/s3.js';
 import { uploadPdf, getPdfUrl } from '../services/s3.js';
@@ -73,7 +73,40 @@ export async function createOrcamento(req, res) {
     return res.status(500).json({ error: 'Falha ao criar orçamento e gerar PDF' });
   }
 }
+export async function createVersaoRetorno(req, res) {
+  const idProcedimento = parseInt(req.params.idProcedimento, 10);
+  if (Number.isNaN(idProcedimento)) {
+    return res.status(400).json({ error: 'idProcedimento inválido' });
+  }
 
+  const { num_retorno = 0, descricao, dt_retorno } = req.body;
+
+  try {
+    const proc = await OrcamentoProcedimento.findByPk(idProcedimento);
+    if (!proc) {
+      return res.status(404).json({ error: 'Procedimento não encontrado' });
+    }
+  } catch (err) {
+    console.warn('Erro ao verificar procedimento (pule se não usar modelo):', err.message);
+  }
+
+  const payload = {
+    procedimento_id: idProcedimento,
+    num_retorno,
+    descricao,
+    dt_retorno, 
+  };
+
+  try {
+    const versaoRetorno = await VersionamentoRetorno.create(payload);
+    return res.status(201).json(versaoRetorno.toJSON());
+  } catch (error) {
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ error: 'Dados inválidos', details: error.errors.map(e => e.message) });
+    }
+    return res.status(500).json({ error: 'Erro ao criar versaoRetorno', message: error.message });
+  }
+}
 export async function getPdfOrcamento(req, res) {
   try {
     const id = req.params.id;
@@ -101,7 +134,6 @@ export async function uploadFotos(req, res) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    // Pega a maior ordem atual
     const lastFoto = await ProcedimentoFoto.findOne({
       where: { procedimento_id: idProcedimento },
       order: [['ordem', 'DESC']],
@@ -173,10 +205,10 @@ export async function getFotoUrls(req, res) {
 
 export async function deleteFoto(req, res) {
   try {
-    const {  fotoId } = req.params;
+    const { fotoId } = req.params;
 
     const foto = await ProcedimentoFoto.findOne({
-      where: { id: fotoId}
+      where: { id: fotoId }
     });
 
     if (!foto) return res.status(404).json({ error: 'Foto não encontrada' });
@@ -186,13 +218,13 @@ export async function deleteFoto(req, res) {
     try {
       await deleteKey(key);
     } catch (s3err) {
-  
+
       console.error('Erro ao deletar do S3:', s3err);
     }
-   foto.destroy()
+    foto.destroy()
     await foto.save();
 
-  
+
     return res.json({ ok: true, fotoId: foto.id });
   } catch (err) {
     console.error('deleteFoto error:', err);
@@ -208,12 +240,10 @@ export async function replaceFoto(req, res) {
       return res.status(400).json({ error: 'Arquivo não enviado' });
     }
 
-    // validação básica
     if (!req.file.mimetype?.startsWith('image/')) {
       return res.status(400).json({ error: 'Apenas imagens são permitidas' });
     }
 
-    // busca registro existente
     const foto = await ProcedimentoFoto.findOne({
       where: { id: fotoId, procedimento_id: procId },
     });
@@ -221,15 +251,12 @@ export async function replaceFoto(req, res) {
 
     const oldKey = foto.s3_key;
 
-    // gerar nova key
     const ext = (req.file.originalname?.split('.').pop() || req.file.mimetype.split('/')[1] || 'jpg');
-    const newKey = `procedimentos/${procId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const newKey = `procedimentos/${procId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    // 1) upload novo arquivo para S3
     await uploadBuffer(req.file.buffer, newKey, req.file.mimetype);
-
-    // 2) atualiza DB dentro de transação para consistência (remove vazamento se falhar)
-    const sequelize = ProcedimentoFoto.sequelize; // assume model ligado ao db
+    
+    const sequelize = ProcedimentoFoto.sequelize; 
     const t = await sequelize.transaction();
     try {
       foto.s3_key = newKey;
@@ -237,19 +264,15 @@ export async function replaceFoto(req, res) {
       await t.commit();
     } catch (dbErr) {
       await t.rollback();
-      // remove novo arquivo do S3 para não vazar
       try { await deleteKey(newKey); } catch (e) { console.error('Erro deletando novoKey após rollback:', e); }
       throw dbErr;
     }
-
-    // 3) tenta deletar o antigo (se falhar, apenas logamos)
     try {
       if (oldKey) await deleteKey(oldKey);
     } catch (delErr) {
       console.error('Erro ao deletar key antiga do S3:', delErr);
     }
 
-    // 4) retorna info atualizada com URL assinada
     const url = await getUrl(newKey, 3600);
     return res.json({
       ok: true,
@@ -332,6 +355,32 @@ export async function getOrcamentoById(req, res) {
     console.error('Erro ao buscar orcamento:', error);
     return res.status(500).json({
       error: 'Erro ao buscar orcamento',
+      message: error.message
+    });
+  }
+}
+
+export async function getVersaoRetornoByProcedimento(req, res) {
+  const idProcedimento = parseInt(req.params.idProcedimento, 10);
+  if (Number.isNaN(idProcedimento)) {
+    return res.status(400).json({ error: 'idProcedimento inválido' });
+  }
+
+  try {
+    const versoesRetorno = await VersionamentoRetorno.findAll({
+      where: { procedimento_id: idProcedimento },
+      order: [['num_retorno', 'ASC']], 
+    });
+
+    if (!versoesRetorno || versoesRetorno.length === 0) {
+      return res.status(404).json({ error: 'Nenhuma versão de retorno encontrada para esse procedimento' });
+    }
+
+    return res.json(versoesRetorno);
+  } catch (error) {
+    console.error('Erro ao buscar versoesRetorno:', error);
+    return res.status(500).json({
+      error: 'Erro ao buscar versoesRetorno',
       message: error.message
     });
   }
@@ -600,5 +649,7 @@ export default {
   uploadFotos,
   getFotoUrls,
   deleteFoto,
-  replaceFoto
+  replaceFoto,
+  createVersaoRetorno,
+  getVersaoRetornoByProcedimento,
 }
