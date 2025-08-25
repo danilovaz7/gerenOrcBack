@@ -94,7 +94,7 @@ export async function createVersaoRetorno(req, res) {
     procedimento_id: idProcedimento,
     num_retorno,
     descricao,
-    dt_retorno, 
+    dt_retorno,
   };
 
   try {
@@ -107,6 +107,7 @@ export async function createVersaoRetorno(req, res) {
     return res.status(500).json({ error: 'Erro ao criar versaoRetorno', message: error.message });
   }
 }
+
 export async function getPdfOrcamento(req, res) {
   try {
     const id = req.params.id;
@@ -255,8 +256,8 @@ export async function replaceFoto(req, res) {
     const newKey = `procedimentos/${procId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     await uploadBuffer(req.file.buffer, newKey, req.file.mimetype);
-    
-    const sequelize = ProcedimentoFoto.sequelize; 
+
+    const sequelize = ProcedimentoFoto.sequelize;
     const t = await sequelize.transaction();
     try {
       foto.s3_key = newKey;
@@ -369,7 +370,7 @@ export async function getVersaoRetornoByProcedimento(req, res) {
   try {
     const versoesRetorno = await VersionamentoRetorno.findAll({
       where: { procedimento_id: idProcedimento },
-      order: [['num_retorno', 'ASC']], 
+      order: [['num_retorno', 'ASC']],
     });
 
     if (!versoesRetorno || versoesRetorno.length === 0) {
@@ -579,6 +580,39 @@ async function updateOrcamento(req, res) {
   });
 }
 
+export async function updateVersaoRetornoById(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ error: 'id inválido' });
+  }
+
+  const { num_retorno, descricao, dt_retorno } = req.body;
+
+  try {
+    const versao = await VersionamentoRetorno.findByPk(id);
+    if (!versao) {
+      return res.status(404).json({ error: 'versaoRetorno não encontrado' });
+    }
+
+    // permitir valores falsy (ex: 0) — só checar undefined
+    if (num_retorno !== undefined) versao.num_retorno = num_retorno;
+    if (descricao !== undefined) versao.descricao = descricao;
+    if (dt_retorno !== undefined) versao.dt_retorno = dt_retorno;
+
+    try {
+      await versao.validate();
+    } catch (valErr) {
+      return res.status(400).json({ error: 'Dados inválidos', details: valErr.errors?.map(e => e.message) ?? valErr.message });
+    }
+
+    await versao.save();
+    return res.json(versao.toJSON());
+  } catch (err) {
+    console.error('Erro ao atualizar versaoRetorno:', err);
+    return res.status(500).json({ error: 'Erro ao atualizar versaoRetorno', message: err.message });
+  }
+}
+
 async function updateProcedimento(req, res) {
   const { idProcedimento } = req.params
   const { status_retorno, dt_realizacao, num_retorno, obs_procedimento } = req.body;
@@ -652,4 +686,5 @@ export default {
   replaceFoto,
   createVersaoRetorno,
   getVersaoRetornoByProcedimento,
+  updateRetorno
 }
