@@ -10,15 +10,15 @@ const OrcamentoProcedimento = database.define('orcamento_procedimentos', {
   },
   nome_procedimento: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
    obs_procedimento: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   valor_procedimento: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
+    allowNull: true,
   },
   orcamento_id: {
     type: DataTypes.INTEGER,
@@ -40,12 +40,12 @@ const OrcamentoProcedimento = database.define('orcamento_procedimentos', {
   },
   status_retorno: {
     type: DataTypes.ENUM('Finalizado', 'Aguardando procedimento', 'Retorno'),
-    allowNull: false,
+    allowNull: true,
     defaultValue: 'Aguardando procedimento',
   },
   num_retorno: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     defaultValue: 0,
   },
   dt_realizacao: {

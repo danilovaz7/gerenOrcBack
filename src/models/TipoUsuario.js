@@ -11,7 +11,7 @@ const TipoUsuario = database.define('tipo_usuario', {
   },
   nome: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     unique: true, // Cada tipo de usuário deve ser único
   },
 }, {

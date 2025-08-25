@@ -19,7 +19,7 @@ const Orcamento = database.define('Orcamento', {
   },
   forma_pagamento: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   validade: {
     type: DataTypes.DATEONLY,
@@ -31,12 +31,12 @@ const Orcamento = database.define('Orcamento', {
   },
   status: {
     type: DataTypes.ENUM('Aguardando pagamento', 'Pago'),
-    allowNull: false,
+    allowNull: true,
     defaultValue: 'Aguardando pagamento',
   },
   valor_total: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
+    allowNull: true,
   },
   arquivo_pdf: {
     type: DataTypes.STRING,
