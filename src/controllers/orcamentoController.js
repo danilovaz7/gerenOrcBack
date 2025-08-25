@@ -686,5 +686,5 @@ export default {
   replaceFoto,
   createVersaoRetorno,
   getVersaoRetornoByProcedimento,
-  updateRetorno
+  updateVersaoRetornoById
 }

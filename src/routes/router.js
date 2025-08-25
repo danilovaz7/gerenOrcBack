@@ -37,8 +37,8 @@ router.get('/procedimento/:idProcedimento/url', orcamentoController.getFotoUrls)
 router.delete('/procedimento/foto/:fotoId',  orcamentoController.deleteFoto);
 router.put('/procedimento/:procId/foto/:fotoId/replace',uploadMemory.single('file'), orcamentoController.replaceFoto);
 router.post('/procedimento/:idProcedimento/retornos', orcamentoController.createVersaoRetorno)
-router.get('/procedimento/:idProcedimento/retornos', orcamentoController.get)
-router.put('/procedimento/:idProcedimento/retornos', orcamentoController.updateRetorno)
+router.get('/procedimento/:idProcedimento/retornos', orcamentoController.getVersaoRetornoByProcedimento)
+router.put('/procedimento/retornos/:id', orcamentoController.updateVersaoRetornoById);
 
 router.post('/login', loginController.login)
 router.get('/eu', pegarUsuarioDoToken)
