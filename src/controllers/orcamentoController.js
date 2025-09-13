@@ -14,7 +14,7 @@ import { getUrl } from '../services/s3.js';
 
 export async function createOrcamento(req, res) {
   const sequelize = Orcamento.sequelize;
-  const { usuario_id, forma_pagamento, validade, valor_total, valor_parcelado, procedimentos = [] } = req.body;
+  const { usuario_id, forma_pagamento, validade, valor_total, valor_parcelado, procedimentos = [], observacao_pagamento } = req.body;
 
   const t = await sequelize.transaction();
   try {
@@ -52,7 +52,8 @@ export async function createOrcamento(req, res) {
       { forma_pagamento, validade, valor_parcelado, valor_total, logo: logoDataUrl },
       procedimentos,
       nomeUsuario,
-      orcamento.createdAt
+      orcamento.createdAt,
+      observacao_pagamento
     );
 
     const key = `orcamentos/${orcamento.id}-${Date.now()}.pdf`;

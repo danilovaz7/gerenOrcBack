@@ -35,6 +35,7 @@ export async function gerarPdfOrcamento(
   procedimentos,
   nomeUsuario,
   dataCriacao,
+  obs_pagamento
 ) {
   const templateDataUrl = carregarTemplateDataUrl()
 
@@ -55,7 +56,7 @@ export async function gerarPdfOrcamento(
         text: 'Orçamento',
         style: 'header',
         alignment: 'center',
-        margin: [0, 80, 0, 20]   
+        margin: [0, 80, 0, 20]
       },
       {
         text: `Nome do paciente: ${nomeUsuario}`, margin: [0, 0, 0, 5]
@@ -90,12 +91,17 @@ export async function gerarPdfOrcamento(
         margin: [0, 5, 0, 5],
         alignment: 'right'
       },
-       {
+      {
         text: `Valor Parcelado: R$ ${orcamento.valor_parcelado}`,
         margin: [0, 5, 0, 10],
         alignment: 'right'
+      },
+      {
+        text: `Observações: ${obs_pagamento}`,
+        margin: [0, 5, 0, 10],
+        alignment: 'right'
       }
-      
+
     ],
     styles: {
       header: { fontSize: 20, bold: true, margin: [0, 0, 0, 10] },
