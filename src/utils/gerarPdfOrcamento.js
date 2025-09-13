@@ -39,7 +39,65 @@ export async function gerarPdfOrcamento(
 ) {
   const templateDataUrl = carregarTemplateDataUrl()
 
-  const formaPagCap = capitalize(orcamento.forma_pagamento)
+  const formaPagCap = capitalize(orcamento?.forma_pagamento)
+
+  // garante que procedimentos é uma array para evitar erro ao map
+  const procedimentosList = Array.isArray(procedimentos) ? procedimentos : []
+
+  // monta o conteúdo principal numa array que podemos modificar
+  const content = [
+    {
+      text: 'Orçamento',
+      style: 'header',
+      alignment: 'center',
+      margin: [0, 80, 0, 20]
+    },
+    { text: `Nome do paciente: ${nomeUsuario}`, margin: [0, 0, 0, 5] },
+    { text: `Data de Criação: ${formatarDataBrasileira(dataCriacao)}`, margin: [0, 0, 0, 5] },
+    { text: `Data de Validade: ${formatarDataBrasileira(orcamento?.validade)}`, margin: [0, 0, 0, 10] },
+
+    { text: 'Procedimentos', style: 'subheader' },
+    {
+      style: 'procedimentosTable',
+      table: {
+        widths: ['*', 80, 'auto', '*'],
+        body: [
+          ['Nome', 'Valor', 'Data', 'Observações'],
+          ...procedimentosList.map(p => {
+            const valor = parseFloat(p?.valor_procedimento) || 0
+            return [
+              p?.nome_procedimento || '---',
+              { text: `R$ ${valor.toFixed(2)}`, style: 'valorTable' },
+              formatarDataBrasileira(p?.dt_realizacao),
+              p?.obs_procedimento || '---'
+            ]
+          })
+        ]
+      }
+    },
+
+    { text: ' ', margin: [0, 10, 0, 0] },
+    { text: `Forma de Pagamento: ${formaPagCap}`, margin: [0, 20, 0, 5], alignment: 'right' },
+    {
+      text: `Valor Total: R$ ${parseFloat(orcamento?.valor_total || 0).toFixed(2)}`,
+      margin: [0, 5, 0, 5],
+      alignment: 'right'
+    },
+    {
+      text: `Valor Parcelado: R$ ${orcamento?.valor_parcelado ?? '---'}`,
+      margin: [0, 5, 0, 10],
+      alignment: 'right'
+    }
+  ]
+
+  // adiciona observações apenas se houver conteúdo (não nulo/não vazio)
+  if (obs_pagamento && String(obs_pagamento).trim() !== '') {
+    content.push({
+      text: `Observações: ${obs_pagamento}`,
+      margin: [0, 5, 0, 10],
+      alignment: 'right'
+    })
+  }
 
   const docDefinition = {
     pageSize: 'A4',
@@ -51,65 +109,14 @@ export async function gerarPdfOrcamento(
         absolutePosition: { x: 0, y: 0 }
       }
     ],
-    content: [
-      {
-        text: 'Orçamento',
-        style: 'header',
-        alignment: 'center',
-        margin: [0, 80, 0, 20]
-      },
-      {
-        text: `Nome do paciente: ${nomeUsuario}`, margin: [0, 0, 0, 5]
-      },
-      { text: `Data de Criação: ${formatarDataBrasileira(dataCriacao)}`, margin: [0, 0, 0, 5] },
-      { text: `Data de Validade: ${formatarDataBrasileira(orcamento.validade)}`, margin: [0, 0, 0, 10] },
-
-      { text: 'Procedimentos', style: 'subheader' },
-      {
-        style: 'procedimentosTable',
-        table: {
-          widths: ['*', 80, 'auto', '*'],
-          body: [
-            ['Nome', 'Valor', 'Data', 'Observações'],
-            ...procedimentos.map(p => {
-              const valor = parseFloat(p.valor_procedimento) || 0
-              return [
-                p.nome_procedimento,
-                { text: `R$ ${valor.toFixed(2)}`, style: 'valorTable' },
-                formatarDataBrasileira(p.dt_realizacao),
-                p.obs_procedimento || '---'
-              ]
-            })
-          ]
-        }
-      },
-
-      { text: ' ', margin: [0, 10, 0, 0] },
-      { text: `Forma de Pagamento: ${formaPagCap}`, margin: [0, 20, 0, 5], alignment: 'right' },
-      {
-        text: `Valor Total: R$ ${parseFloat(orcamento.valor_total).toFixed(2)}`,
-        margin: [0, 5, 0, 5],
-        alignment: 'right'
-      },
-      {
-        text: `Valor Parcelado: R$ ${orcamento.valor_parcelado}`,
-        margin: [0, 5, 0, 10],
-        alignment: 'right'
-      },
-      {
-        text: `Observações: ${obs_pagamento}`,
-        margin: [0, 5, 0, 10],
-        alignment: 'right'
-      }
-
-    ],
+    content,
     styles: {
       header: { fontSize: 20, bold: true, margin: [0, 0, 0, 10] },
       subheader: { fontSize: 16, bold: true, margin: [0, 10, 0, 5] },
       procedimentosTable: { fontSize: 10 },
       valorTable: { fontSize: 12, bold: true }
     },
-    defaultStyle: { font: 'Roboto' },
+    defaultStyle: { font: 'Roboto' }
   }
 
   return new Promise(resolve => {
